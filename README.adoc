@@ -21,9 +21,34 @@ A command-line tool to scan all dependencies of a given Go project and check if 
 
 == Installation
 
+=== Homebrew
+
+Install via Homebrew tap:
+
+[source,bash]
+----
+brew tap steffakasid/homebrew-govital
+brew install govital
+----
+
+=== Go Install
+
+Install directly using Go:
+
 [source,bash]
 ----
 go install github.com/steffakasid/govital@latest
+----
+
+=== From Source
+
+Clone and build:
+
+[source,bash]
+----
+git clone https://github.com/steffakasid/govital.git
+cd govital
+go build -o govital ./cmd/govital
 ----
 
 == Usage
@@ -44,6 +69,26 @@ Scan a specific project:
 govital scan --project-path /path/to/project
 ----
 
+=== Set Stale Threshold
+
+Configure when dependencies are considered inactive (default: 365 days):
+
+[source,bash]
+----
+govital scan --stale-threshold 180
+----
+
+=== Log Levels
+
+Set log level for output:
+
+[source,bash]
+----
+govital scan --log-level debug
+----
+
+Available levels: `debug`, `info`, `warn`, `error`
+
 === Configuration
 
 Create a `govital.yaml` in your project root or home directory:
@@ -51,16 +96,7 @@ Create a `govital.yaml` in your project root or home directory:
 [source,yaml]
 ----
 log_level: info
-----
-
-== Log Levels
-
-Available log levels: `debug`, `info`, `warn`, `error`
-
-Set via flag:
-[source,bash]
-----
-govital scan --log-level debug
+stale_threshold: 365
 ----
 
 == License
