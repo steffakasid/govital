@@ -7,8 +7,8 @@ log_level: info  # Options: debug, info, warn, error
 # Scanner configuration
 scanner:
   # Number of days a dependency can be inactive before marked as stale
-  # Default: 365 days (1 year)
-  stale_threshold_days: 365
+  # Default: 30 days
+  stale_threshold_days: 30
 
   # Number of days a dependency must have been updated within to be considered actively maintained
   # Default: 90 days (3 months)

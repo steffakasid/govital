@@ -147,9 +147,9 @@ func TestGetStaleThresholdDays(t *testing.T) {
 		expected    int
 	}{
 		{
-			name:        "default 365 days",
-			configValue: 365,
-			expected:    365,
+			name:        "default 30 days",
+			configValue: 30,
+			expected:    30,
 		},
 		{
 			name:        "custom 180 days",
@@ -157,9 +157,9 @@ func TestGetStaleThresholdDays(t *testing.T) {
 			expected:    180,
 		},
 		{
-			name:        "aggressive 30 days",
-			configValue: 30,
-			expected:    30,
+			name:        "lenient 365 days",
+			configValue: 365,
+			expected:    365,
 		},
 	}
 

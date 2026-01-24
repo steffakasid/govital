@@ -13,7 +13,7 @@ func TestNewScanner(t *testing.T) {
 
 	assert.NotNil(t, scanner)
 	assert.Equal(t, projectPath, scanner.projectPath)
-	assert.Equal(t, 365, scanner.staleThresholdDays)
+	assert.Equal(t, 30, scanner.staleThresholdDays)
 	assert.NotNil(t, scanner.result)
 	assert.Equal(t, projectPath, scanner.result.ProjectPath)
 	assert.Equal(t, 0, len(scanner.result.Dependencies))

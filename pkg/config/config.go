@@ -33,7 +33,7 @@ func (c *Config) Init() {
 
 	// Set defaults
 	c.viper.SetDefault("log_level", "info")
-	c.viper.SetDefault("scanner.stale_threshold_days", 365)
+	c.viper.SetDefault("scanner.stale_threshold_days", 30)
 	c.viper.SetDefault("scanner.active_threshold_days", 90)
 
 	// Read config file

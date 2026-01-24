@@ -49,6 +49,6 @@ func init() {
 	rootCmd.AddCommand(scanCmd)
 
 	scanCmd.Flags().StringP("project-path", "p", ".", "Path to the Go project to scan")
-	scanCmd.Flags().IntP("stale-threshold", "t", 365, "Number of days a dependency can be inactive before marked as stale")
+	scanCmd.Flags().IntP("stale-threshold", "t", 30, "Number of days a dependency can be inactive before marked as stale")
 }
 

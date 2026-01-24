@@ -47,11 +47,11 @@ func NewScanner(projectPath string) *Scanner {
 		ProjectPath:  projectPath,
 		Dependencies: make([]Dependency, 0),
 	}
-	result.Summary.StaleThresholdDays = 365 // Set default threshold in result
+	result.Summary.StaleThresholdDays = 30 // Set default threshold in result
 
 	return &Scanner{
 		projectPath:        projectPath,
-		staleThresholdDays: 365,
+		staleThresholdDays: 30,
 		result:             result,
 	}
 }
