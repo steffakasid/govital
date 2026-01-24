@@ -1,0 +1,56 @@
+{
+  "extends": [
+    "config:recommended"
+  ],
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
+  "packageRules": [
+    {
+      "matchUpdateTypes": [
+        "minor",
+        "patch",
+        "pin",
+        "digest"
+      ],
+      "automerge": true,
+      "groupName": "Dependencies (non-major)",
+      "groupSlug": "non-major"
+    },
+    {
+      "matchUpdateTypes": [
+        "major"
+      ],
+      "automerge": true,
+      "groupName": "Dependencies (major)",
+      "groupSlug": "major"
+    },
+    {
+      "matchDatasources": ["golang-version"],
+      "rangeStrategy": "bump"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^.*go$/"
+      ],
+      "matchStrings": [
+        "//go:generate go run (?<depName>.+?)@(?<currentValue>.*?)\n$"
+      ],
+      "datasourceTemplate": "go"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^.github/workflows/.*\\.yml$/"
+      ],
+      "matchStrings": [
+        "(?<depName>go)-version: (?<currentValue>.*?)\n"
+      ],
+      "depNameTemplate": "go",
+      "datasourceTemplate": "golang-version"
+    }
+  ]
+}

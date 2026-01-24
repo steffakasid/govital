@@ -1,0 +1,7 @@
+packages:
+  github.com/steffakasid/awsclean/internal:
+    config:
+      filename: "{{.InterfaceName}}.go"
+      dir: "internal/mocks"
+      recursive: True
+      log-level: "info"

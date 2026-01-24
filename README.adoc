@@ -1,0 +1,110 @@
+= Govital - Go Dependency Maintenance Scanner
+
+image:https://img.shields.io/badge/License-Apache%202.0-blue.svg[link="http://www.apache.org/licenses/LICENSE-2.0"]
+
+A command-line tool to scan all dependencies of a given Go project and check if those dependencies are actively maintained and if the used versions are up to date.
+
+== Features
+
+* Scans all dependencies of a Go project
+* Checks if dependencies are actively maintained
+* Identifies outdated dependency versions
+* Provides detailed dependency status report
+
+== Prerequisites
+
+* Go 1.24.5 or later
+* Git (for downloading dependencies)
+
+== Installation
+
+[source,bash]
+----
+go install github.com/steffakasid/govital@latest
+----
+
+== Usage
+
+=== Basic Scan
+
+Scan the current project:
+
+[source,bash]
+----
+govital scan
+----
+
+Scan a specific project:
+
+[source,bash]
+----
+govital scan --project-path /path/to/project
+----
+
+=== Configuration
+
+Create a `govital.yaml` in your project root or home directory:
+
+[source,yaml]
+----
+log_level: info
+----
+
+== Log Levels
+
+Available log levels: `debug`, `info`, `warn`, `error`
+
+Set via flag:
+[source,bash]
+----
+govital scan --log-level debug
+----
+
+== License
+
+Apache License 2.0
+
+`awsclean ami --older-then 5w` delete all images which are older then 5w and are unused
+
+`awsclean ami --ignore ^amia.* --ignore ^amib.*` delete all images which name does not start with amia or amib
+
+`awsclean ami --launch-templates` additionally scan launch templates for used AMIs
+
+`awsclean ebs --older-then 5w` delete all EBS volumes which are older then 5w and are not bound
+
+`awsclean ebs --dry-run` do not delete any EBS volume just show what you would do
+
+=== Filter Logic
+
+1st:: all used AMIs are filtered out
+2nd:: all ignore patterns are matched an ignored AMIs are filtered out
+3rd:: the age of the AMI is checked if it's younger then the given duration the AMI is filtered out
+
+=== Flags
+-a, --account string:: Set AWS account number to cleanup AMIs. Used to set owner information when selecting AMIs. If not set only 'self' is used.
+-d, --dry-run:: If set to true nothing will be deleted. And amiclean will just show what it would do!
+-o, --older-then string:: Set the duration string (e.g 5d, 1w etc.) how old AMIs must be to be deleted. E.g. if set to 7d, AMIs will be delete which are older then 7 days. (default "7d")
+-i, --ignore stringArray:: Set ignore regex patterns. If a ami name matches the pattern it will be exclueded from cleanup.
+-l, --launch-templates:: Additionally scan launch templates for used AMIs.
+-?, --help:: Print usage information
+-v, --version:: Print version information
+
+== Development
+
+=== Generate mock using mockery
+
+In order to test the ec2client I used link:https://github.com/vektra/mockery[mockery] to create the mocks:
+
+.To generate the mocks. Just run:
+[source,sh]
+----
+go generate ./...
+----
+
+The mockery configuration is done in:
+
+..mockery.yaml
+[source, yaml]
+----
+include::.mockery.yaml[]
+----

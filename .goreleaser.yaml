@@ -1,0 +1,67 @@
+---
+version: 2
+project_name: govital
+dist: dist
+
+before:
+  hooks:
+    - go mod download
+    - go generate ./...
+
+builds:
+  - id: govital
+    main: ./cmd/govital
+    binary: govital
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+    ldflags:
+      - -s -w -X github.com/steffakasid/govital/internal/version.Version={{.Version}}
+      - -X github.com/steffakasid/govital/internal/version.BuildDate={{.Date}}
+      - -X github.com/steffakasid/govital/internal/version.GitCommit={{.Commit}}
+
+archives:
+  - id: govital
+    builds:
+      - govital
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+
+dockers:
+  - id: govital
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+    image_templates:
+      - "docker.io/steffakasid/{{.ProjectName}}:latest"
+      - "docker.io/steffakasid/{{.ProjectName}}:{{.Version}}"
+    dockerfile: build/Dockerfile
+    extra_files:
+      - LICENSE
+      - README.adoc
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  github:
+    owner: steffakasid
+    name: govital
