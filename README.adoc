@@ -91,59 +91,38 @@ Available levels: `debug`, `info`, `warn`, `error`
 
 === Configuration
 
-Create a `govital.yaml` in your project root or home directory:
+Create a `govital.yaml` in your project root, `~/.govital/`, or `/etc/govital/`:
 
 [source,yaml]
 ----
-log_level: info
-stale_threshold: 365
+log_level: info  # Options: debug, info, warn, error
+
+scanner:
+  # Days a dependency can be inactive before marked as stale (default: 365)
+  stale_threshold_days: 365
+
+  # Days a dependency must be updated within to be considered active (default: 90)
+  active_threshold_days: 90
 ----
+
+You can also use CLI flags to override config file settings:
+
+[source,bash]
+----
+# Override stale threshold via CLI
+govital scan --stale-threshold 180
+
+# Override log level
+govital scan --log-level debug
+----
+
+=== Configuration Priority
+
+1. CLI flags (highest priority)
+2. Config file (`govital.yaml`)
+3. Environment variables (future support)
+4. Defaults (lowest priority)
 
 == License
 
 Apache License 2.0
-
-`awsclean ami --older-then 5w` delete all images which are older then 5w and are unused
-
-`awsclean ami --ignore ^amia.* --ignore ^amib.*` delete all images which name does not start with amia or amib
-
-`awsclean ami --launch-templates` additionally scan launch templates for used AMIs
-
-`awsclean ebs --older-then 5w` delete all EBS volumes which are older then 5w and are not bound
-
-`awsclean ebs --dry-run` do not delete any EBS volume just show what you would do
-
-=== Filter Logic
-
-1st:: all used AMIs are filtered out
-2nd:: all ignore patterns are matched an ignored AMIs are filtered out
-3rd:: the age of the AMI is checked if it's younger then the given duration the AMI is filtered out
-
-=== Flags
--a, --account string:: Set AWS account number to cleanup AMIs. Used to set owner information when selecting AMIs. If not set only 'self' is used.
--d, --dry-run:: If set to true nothing will be deleted. And amiclean will just show what it would do!
--o, --older-then string:: Set the duration string (e.g 5d, 1w etc.) how old AMIs must be to be deleted. E.g. if set to 7d, AMIs will be delete which are older then 7 days. (default "7d")
--i, --ignore stringArray:: Set ignore regex patterns. If a ami name matches the pattern it will be exclueded from cleanup.
--l, --launch-templates:: Additionally scan launch templates for used AMIs.
--?, --help:: Print usage information
--v, --version:: Print version information
-
-== Development
-
-=== Generate mock using mockery
-
-In order to test the ec2client I used link:https://github.com/vektra/mockery[mockery] to create the mocks:
-
-.To generate the mocks. Just run:
-[source,sh]
-----
-go generate ./...
-----
-
-The mockery configuration is done in:
-
-..mockery.yaml
-[source, yaml]
-----
-include::.mockery.yaml[]
-----

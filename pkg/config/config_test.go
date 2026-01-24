@@ -139,3 +139,91 @@ func TestGetLogLevelString(t *testing.T) {
 func TestConfigViper(t *testing.T) {
 	assert.NotNil(t, Viper)
 }
+
+func TestGetStaleThresholdDays(t *testing.T) {
+	tests := []struct {
+		name        string
+		configValue int
+		expected    int
+	}{
+		{
+			name:        "default 365 days",
+			configValue: 365,
+			expected:    365,
+		},
+		{
+			name:        "custom 180 days",
+			configValue: 180,
+			expected:    180,
+		},
+		{
+			name:        "aggressive 30 days",
+			configValue: 30,
+			expected:    30,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := NewConfig()
+			cfg.viper.Set("scanner.stale_threshold_days", tt.configValue)
+
+			result := cfg.GetStaleThresholdDays()
+
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestGetActiveThresholdDays(t *testing.T) {
+	tests := []struct {
+		name        string
+		configValue int
+		expected    int
+	}{
+		{
+			name:        "default 90 days",
+			configValue: 90,
+			expected:    90,
+		},
+		{
+			name:        "custom 180 days",
+			configValue: 180,
+			expected:    180,
+		},
+		{
+			name:        "lenient 365 days",
+			configValue: 365,
+			expected:    365,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := NewConfig()
+			cfg.viper.Set("scanner.active_threshold_days", tt.configValue)
+
+			result := cfg.GetActiveThresholdDays()
+
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSetStaleThresholdDays(t *testing.T) {
+	cfg := NewConfig()
+	cfg.SetStaleThresholdDays(120)
+
+	result := cfg.GetStaleThresholdDays()
+
+	assert.Equal(t, 120, result)
+}
+
+func TestSetActiveThresholdDays(t *testing.T) {
+	cfg := NewConfig()
+	cfg.SetActiveThresholdDays(60)
+
+	result := cfg.GetActiveThresholdDays()
+
+	assert.Equal(t, 60, result)
+}

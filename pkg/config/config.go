@@ -33,6 +33,8 @@ func (c *Config) Init() {
 
 	// Set defaults
 	c.viper.SetDefault("log_level", "info")
+	c.viper.SetDefault("scanner.stale_threshold_days", 365)
+	c.viper.SetDefault("scanner.active_threshold_days", 90)
 
 	// Read config file
 	if err := c.viper.ReadInConfig(); err != nil {
@@ -64,4 +66,28 @@ func (c *Config) GetLogLevelString() string {
 		return "info"
 	}
 	return levelStr
+}
+
+// Scanner configuration
+
+// GetStaleThresholdDays returns the number of days a dependency can be inactive before being marked as stale.
+// Default: 365 days
+func (c *Config) GetStaleThresholdDays() int {
+	return c.viper.GetInt("scanner.stale_threshold_days")
+}
+
+// GetActiveThresholdDays returns the number of days a dependency must have been updated within to be considered active.
+// Default: 90 days
+func (c *Config) GetActiveThresholdDays() int {
+	return c.viper.GetInt("scanner.active_threshold_days")
+}
+
+// SetStaleThresholdDays sets the stale threshold in the config.
+func (c *Config) SetStaleThresholdDays(days int) {
+	c.viper.Set("scanner.stale_threshold_days", days)
+}
+
+// SetActiveThresholdDays sets the active threshold in the config.
+func (c *Config) SetActiveThresholdDays(days int) {
+	c.viper.Set("scanner.active_threshold_days", days)
 }
