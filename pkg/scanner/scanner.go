@@ -7,42 +7,58 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/steffakasid/eslog"
 )
 
 type Dependency struct {
-	Path    string
-	Version string
-	Update  string
-	Latest  string
-	Error   string
+	Path              string
+	Version           string
+	Update            string
+	Latest            string
+	Error             string
+	LastCommitTime    time.Time
+	IsActive          bool
+	DaysSinceLastCommit int
 }
 
 type ScanResult struct {
 	ProjectPath  string
 	Dependencies []Dependency
 	Summary      struct {
-		Total      int
-		Updated    int
-		Outdated   int
-		Errors     int
+		Total           int
+		Updated         int
+		Outdated        int
+		Errors          int
+		Inactive        int
+		StaleThresholdDays int
 	}
 }
 
 type Scanner struct {
-	projectPath string
-	result      *ScanResult
+	projectPath        string
+	result             *ScanResult
+	staleThresholdDays int
 }
 
 func NewScanner(projectPath string) *Scanner {
-	return &Scanner{
-		projectPath: projectPath,
-		result: &ScanResult{
-			ProjectPath:  projectPath,
-			Dependencies: make([]Dependency, 0),
-		},
+	result := &ScanResult{
+		ProjectPath:  projectPath,
+		Dependencies: make([]Dependency, 0),
 	}
+	result.Summary.StaleThresholdDays = 365 // Set default threshold in result
+
+	return &Scanner{
+		projectPath:        projectPath,
+		staleThresholdDays: 365,
+		result:             result,
+	}
+}
+
+func (s *Scanner) SetStaleThreshold(days int) {
+	s.staleThresholdDays = days
+	s.result.Summary.StaleThresholdDays = days
 }
 
 func (s *Scanner) Scan() error {
@@ -82,35 +98,102 @@ func (s *Scanner) Scan() error {
 			continue // Skip main module
 		}
 
-		s.result.Dependencies = append(s.result.Dependencies, Dependency{
-			Path:    dep.Path,
-			Version: dep.Version,
-		})
+		dependency := Dependency{
+			Path:     dep.Path,
+			Version:  dep.Version,
+			IsActive: true,
+		}
+
+		// Check maintenance status
+		if err := s.checkMaintenanceStatus(&dependency); err != nil {
+			eslog.Warnf("Failed to check maintenance status for %s: %v", dep.Path, err)
+		}
+
+		s.result.Dependencies = append(s.result.Dependencies, dependency)
 		s.result.Summary.Total++
+
+		if !dependency.IsActive {
+			s.result.Summary.Inactive++
+		}
 	}
 
+	s.result.Summary.StaleThresholdDays = s.staleThresholdDays
 	eslog.Infof("Dependencies found: %d", s.result.Summary.Total)
+	return nil
+}
+
+func (s *Scanner) checkMaintenanceStatus(dep *Dependency) error {
+	// Try to get the repository metadata using go mod graph or inspect
+	cmd := exec.Command("go", "mod", "download", "-json", dep.Path+"@"+dep.Version)
+	cmd.Dir = s.projectPath
+
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback: mark as potentially stale if we can't check
+		return fmt.Errorf("failed to check %s: %w", dep.Path, err)
+	}
+
+	var modInfo struct {
+		Info struct {
+			Version string    `json:"Version"`
+			Time    time.Time `json:"Time"`
+		} `json:"Info"`
+	}
+
+	if err := json.Unmarshal(output, &modInfo); err != nil {
+		return fmt.Errorf("failed to unmarshal module info: %w", err)
+	}
+
+	dep.LastCommitTime = modInfo.Info.Time
+	daysSinceCommit := int(time.Since(dep.LastCommitTime).Hours() / 24)
+	dep.DaysSinceLastCommit = daysSinceCommit
+
+	if daysSinceCommit > s.staleThresholdDays {
+		dep.IsActive = false
+	}
+
 	return nil
 }
 
 func (s *Scanner) PrintResults() {
 	fmt.Printf("\n=== Govital Dependency Scan Results ===\n")
-	fmt.Printf("Project: %s\n\n", s.projectPath)
+	fmt.Printf("Project: %s\n", s.projectPath)
+	fmt.Printf("Stale Threshold: %d days\n\n", s.staleThresholdDays)
+
 	fmt.Printf("Summary:\n")
-	fmt.Printf("  Total Dependencies: %d\n", s.result.Summary.Total)
-	fmt.Printf("  Updated:           %d\n", s.result.Summary.Updated)
-	fmt.Printf("  Outdated:          %d\n", s.result.Summary.Outdated)
-	fmt.Printf("  Errors:            %d\n", s.result.Summary.Errors)
+	fmt.Printf("  Total Dependencies:        %d\n", s.result.Summary.Total)
+	fmt.Printf("  Inactive Dependencies:     %d\n", s.result.Summary.Inactive)
+	fmt.Printf("  Errors:                    %d\n", s.result.Summary.Errors)
 	fmt.Printf("\nDependencies:\n")
 
 	for _, dep := range s.result.Dependencies {
+		status := "✓ Active"
+		if !dep.IsActive {
+			status = "✗ Inactive"
+		}
+
 		if dep.Error != "" {
 			fmt.Printf("  - %s@%s [ERROR: %s]\n", dep.Path, dep.Version, dep.Error)
-		} else if dep.Update != "" {
-			fmt.Printf("  - %s@%s (update available: %s)\n", dep.Path, dep.Version, dep.Update)
+		} else if !dep.LastCommitTime.IsZero() {
+			fmt.Printf("  - %s@%s [%s] (last commit: %d days ago)\n",
+				dep.Path, dep.Version, status, dep.DaysSinceLastCommit)
 		} else {
-			fmt.Printf("  - %s@%s\n", dep.Path, dep.Version)
+			fmt.Printf("  - %s@%s [%s]\n", dep.Path, dep.Version, status)
 		}
 	}
 	fmt.Printf("\n")
+}
+
+func (s *Scanner) GetInactiveDependencies() []Dependency {
+	var inactive []Dependency
+	for _, dep := range s.result.Dependencies {
+		if !dep.IsActive {
+			inactive = append(inactive, dep)
+		}
+	}
+	return inactive
+}
+
+func (s *Scanner) GetResults() *ScanResult {
+	return s.result
 }
