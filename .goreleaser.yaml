@@ -34,22 +34,6 @@ archives:
       {{- .Os }}_
       {{- .Arch }}
 
-dockers:
-  - id: govital
-    build_flag_templates:
-      - "--pull"
-      - "--label=org.opencontainers.image.created={{.Date}}"
-      - "--label=org.opencontainers.image.title={{.ProjectName}}"
-      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
-      - "--label=org.opencontainers.image.version={{.Version}}"
-    image_templates:
-      - "docker.io/steffakasid/{{.ProjectName}}:latest"
-      - "docker.io/steffakasid/{{.ProjectName}}:{{.Version}}"
-    dockerfile: build/Dockerfile
-    extra_files:
-      - LICENSE
-      - README.adoc
-
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
   algorithm: sha256
