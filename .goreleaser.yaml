@@ -51,6 +51,8 @@ brews:
       name: homebrew-govital
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
+    url_template: "https://github.com/steffakasid/govital/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
+
     commit_author:
       name: goreleaserbot
       email: goreleaser@steffen-rumpf.de
