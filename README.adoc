@@ -1,6 +1,9 @@
 = Govital - Go Dependency Maintenance Scanner
 
 image:https://img.shields.io/badge/License-Apache%202.0-blue.svg[link="http://www.apache.org/licenses/LICENSE-2.0"]
+image:https://github.com/steffakasid/govital/actions/workflows/codeql-analysis.yml/badge.svg[link:https://github.com/steffakasid/govital/actions/workflows/codeql-analysis.yml]
+image:https://github.com/steffakasid/govital/actions/workflows/release.yml/badge.svg[link:https://github.com/steffakasid/govital/actions/workflows/release.yml]
+image:https://github.com/steffakasid/govital/actions/workflows/go-test.yml/badge.svg[link:https://github.com/steffakasid/govital/actions/workflows/go-test.yml]
 
 A command-line tool to scan all dependencies of a given Go project and check if those dependencies are actively maintained and if the used versions are up to date.
 
