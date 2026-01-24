@@ -123,7 +123,7 @@ func (s *Scanner) Scan() error {
 }
 
 func (s *Scanner) checkMaintenanceStatus(dep *Dependency) error {
-	// Try to get the repository metadata using go mod graph or inspect
+	// Try to get the repository metadata using go mod download
 	cmd := exec.Command("go", "mod", "download", "-json", dep.Path+"@"+dep.Version)
 	cmd.Dir = s.projectPath
 
@@ -133,18 +133,37 @@ func (s *Scanner) checkMaintenanceStatus(dep *Dependency) error {
 		return fmt.Errorf("failed to check %s: %w", dep.Path, err)
 	}
 
-	var modInfo struct {
-		Info struct {
-			Version string    `json:"Version"`
-			Time    time.Time `json:"Time"`
-		} `json:"Info"`
+	// Parse the go mod download output to get Info file path
+	var modDownloadInfo struct {
+		Info string `json:"Info"`
 	}
 
-	if err := json.Unmarshal(output, &modInfo); err != nil {
-		return fmt.Errorf("failed to unmarshal module info: %w", err)
+	if err := json.Unmarshal(output, &modDownloadInfo); err != nil {
+		return fmt.Errorf("failed to unmarshal module download info: %w", err)
 	}
 
-	dep.LastCommitTime = modInfo.Info.Time
+	// The Info field contains the path to the .info file with the actual metadata
+	if modDownloadInfo.Info == "" {
+		return fmt.Errorf("no info file path provided for %s", dep.Path)
+	}
+
+	// Read the .info file
+	infoFileData, err := os.ReadFile(modDownloadInfo.Info)
+	if err != nil {
+		return fmt.Errorf("failed to read info file for %s: %w", dep.Path, err)
+	}
+
+	// Parse the .info file JSON
+	var moduleInfo struct {
+		Version string    `json:"Version"`
+		Time    time.Time `json:"Time"`
+	}
+
+	if err := json.Unmarshal(infoFileData, &moduleInfo); err != nil {
+		return fmt.Errorf("failed to unmarshal module info from %s: %w", modDownloadInfo.Info, err)
+	}
+
+	dep.LastCommitTime = moduleInfo.Time
 	daysSinceCommit := int(time.Since(dep.LastCommitTime).Hours() / 24)
 	dep.DaysSinceLastCommit = daysSinceCommit
 
