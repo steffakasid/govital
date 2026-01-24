@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/steffakasid/eslog"
@@ -42,6 +43,8 @@ type Scanner struct {
 	result                   *ScanResult
 	staleThresholdDays       int
 	includeIndirectDependencies bool
+	workers                  int
+	resultMutex              *sync.Mutex
 }
 
 func NewScanner(projectPath string) *Scanner {
@@ -55,8 +58,17 @@ func NewScanner(projectPath string) *Scanner {
 		projectPath:              projectPath,
 		staleThresholdDays:       30,
 		includeIndirectDependencies: false,
+		workers:                  4,
+		resultMutex:              &sync.Mutex{},
 		result:                   result,
 	}
+}
+
+func (s *Scanner) SetWorkers(count int) {
+	if count < 1 {
+		count = 1
+	}
+	s.workers = count
 }
 
 func (s *Scanner) SetStaleThreshold(days int) {
@@ -98,7 +110,8 @@ func (s *Scanner) Scan() error {
 		return fmt.Errorf("failed to list dependencies: %w", err)
 	}
 
-	// Parse dependencies
+	// Collect dependencies to scan
+	var depsToScan []Dependency
 	decoder := json.NewDecoder(bytes.NewReader(output))
 	for decoder.More() {
 		var dep struct {
@@ -122,28 +135,57 @@ func (s *Scanner) Scan() error {
 			continue
 		}
 
-		dependency := Dependency{
+		depsToScan = append(depsToScan, Dependency{
 			Path:     dep.Path,
 			Version:  dep.Version,
 			IsActive: true,
-		}
-
-		// Check maintenance status
-		if err := s.checkMaintenanceStatus(&dependency); err != nil {
-			eslog.Warnf("Failed to check maintenance status for %s: %v", dep.Path, err)
-		}
-
-		s.result.Dependencies = append(s.result.Dependencies, dependency)
-		s.result.Summary.Total++
-
-		if !dependency.IsActive {
-			s.result.Summary.Inactive++
-		}
+		})
 	}
 
+	// Scan dependencies in parallel
+	s.scanParallel(depsToScan)
+
 	s.result.Summary.StaleThresholdDays = s.staleThresholdDays
-	eslog.Infof("Dependencies found: %d", s.result.Summary.Total)
+	eslog.Infof("Dependencies found: %d (scanned with %d workers)", s.result.Summary.Total, s.workers)
 	return nil
+}
+
+// scanParallel scans dependencies in parallel using worker goroutines
+func (s *Scanner) scanParallel(depsToScan []Dependency) {
+	var wg sync.WaitGroup
+	depChan := make(chan *Dependency, len(depsToScan))
+
+	// Start worker goroutines
+	for i := 0; i < s.workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for dep := range depChan {
+				// Check maintenance status
+				if err := s.checkMaintenanceStatus(dep); err != nil {
+					eslog.Debugf("Failed to check maintenance status for %s: %v", dep.Path, err)
+				}
+
+				// Append result safely
+				s.resultMutex.Lock()
+				s.result.Dependencies = append(s.result.Dependencies, *dep)
+				s.result.Summary.Total++
+				if !dep.IsActive {
+					s.result.Summary.Inactive++
+				}
+				s.resultMutex.Unlock()
+			}
+		}()
+	}
+
+	// Send dependencies to be scanned
+	for i := range depsToScan {
+		depChan <- &depsToScan[i]
+	}
+	close(depChan)
+
+	// Wait for all workers to finish
+	wg.Wait()
 }
 
 func (s *Scanner) checkMaintenanceStatus(dep *Dependency) error {

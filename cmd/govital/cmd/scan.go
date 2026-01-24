@@ -28,10 +28,15 @@ actively maintained and if the used versions are up to date.`,
 			return err
 		}
 
+		workers, err := cmd.Flags().GetInt("workers")
+		if err != nil {
+			return err
+		}
+
 		eslog.Infof("Starting dependency scan: %s", projectPath)
 
 		s := scanner.NewScanner(projectPath)
-		
+
 		// Use CLI flag if provided, otherwise use config
 		if cmd.Flags().Changed("stale-threshold") {
 			s.SetStaleThreshold(staleThreshold)
@@ -45,6 +50,10 @@ actively maintained and if the used versions are up to date.`,
 		} else {
 			cfg := config.NewConfig()
 			s.SetIncludeIndirectDependencies(cfg.GetIncludeIndirectDependencies())
+		}
+
+		if cmd.Flags().Changed("workers") {
+			s.SetWorkers(workers)
 		}
 
 		if err := s.Scan(); err != nil {
@@ -63,5 +72,5 @@ func init() {
 	scanCmd.Flags().StringP("project-path", "p", ".", "Path to the Go project to scan")
 	scanCmd.Flags().IntP("stale-threshold", "t", 30, "Number of days a dependency can be inactive before marked as stale")
 	scanCmd.Flags().BoolP("include-indirect", "i", false, "Include indirect (transitive) dependencies in the scan")
+	scanCmd.Flags().IntP("workers", "w", 4, "Number of parallel workers for scanning dependencies")
 }
-
