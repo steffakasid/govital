@@ -63,6 +63,7 @@ Available flags:
 
 * `-t, --stale-threshold int`: Days before marking as stale (default 30)
 * `-i, --include-indirect`: Include indirect (transitive) dependencies (default false)
+* `-w, --workers int`: Number of parallel workers for scanning (default 4)
 * `-p, --project-path string`: Path to scan (default ".")
 * `-l, --log-level string`: Logging level (default "info")
 
@@ -257,6 +258,36 @@ govital scan --log-level debug
 . Your threshold may be too strict
 . Try increasing threshold:
 +
+[source,bash]
+----
+govital scan --stale-threshold 365
+----
+
+== Performance Tuning
+
+=== Parallel Scanning
+
+Govital uses a worker pool pattern to scan dependencies in parallel. The number of workers can be configured via the `--workers` flag:
+
+* **Default (4 workers)**: Good for most systems and workloads
+* **High-end systems**: Use 8-16 workers for better performance
+* **Resource-constrained**: Use 1-2 workers to minimize CPU/memory usage
+
+Example:
+
+[source,bash]
+----
+# Fast scan on powerful hardware
+govital scan --workers 16
+
+# Conservative scan on limited hardware
+govital scan --workers 1
+----
+
+Performance impact depends on:
+* Number of dependencies (more deps = better parallelism benefit)
+* System CPU cores (more cores = higher optimal worker count)
+* Network latency (downloading module info involves network calls)
 [source,bash]
 ----
 govital scan --stale-threshold 365
