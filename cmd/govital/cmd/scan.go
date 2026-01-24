@@ -23,6 +23,11 @@ actively maintained and if the used versions are up to date.`,
 			return err
 		}
 
+		includeIndirect, err := cmd.Flags().GetBool("include-indirect")
+		if err != nil {
+			return err
+		}
+
 		eslog.Infof("Starting dependency scan: %s", projectPath)
 
 		s := scanner.NewScanner(projectPath)
@@ -33,6 +38,13 @@ actively maintained and if the used versions are up to date.`,
 		} else {
 			cfg := config.NewConfig()
 			s.SetStaleThreshold(cfg.GetStaleThresholdDays())
+		}
+
+		if cmd.Flags().Changed("include-indirect") {
+			s.SetIncludeIndirectDependencies(includeIndirect)
+		} else {
+			cfg := config.NewConfig()
+			s.SetIncludeIndirectDependencies(cfg.GetIncludeIndirectDependencies())
 		}
 
 		if err := s.Scan(); err != nil {
@@ -50,5 +62,6 @@ func init() {
 
 	scanCmd.Flags().StringP("project-path", "p", ".", "Path to the Go project to scan")
 	scanCmd.Flags().IntP("stale-threshold", "t", 30, "Number of days a dependency can be inactive before marked as stale")
+	scanCmd.Flags().BoolP("include-indirect", "i", false, "Include indirect (transitive) dependencies in the scan")
 }
 

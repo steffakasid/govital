@@ -1,6 +1,7 @@
 package scanner
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -37,9 +38,10 @@ type ScanResult struct {
 }
 
 type Scanner struct {
-	projectPath        string
-	result             *ScanResult
-	staleThresholdDays int
+	projectPath              string
+	result                   *ScanResult
+	staleThresholdDays       int
+	includeIndirectDependencies bool
 }
 
 func NewScanner(projectPath string) *Scanner {
@@ -50,9 +52,10 @@ func NewScanner(projectPath string) *Scanner {
 	result.Summary.StaleThresholdDays = 30 // Set default threshold in result
 
 	return &Scanner{
-		projectPath:        projectPath,
-		staleThresholdDays: 30,
-		result:             result,
+		projectPath:              projectPath,
+		staleThresholdDays:       30,
+		includeIndirectDependencies: false,
+		result:                   result,
 	}
 }
 
@@ -61,12 +64,28 @@ func (s *Scanner) SetStaleThreshold(days int) {
 	s.result.Summary.StaleThresholdDays = days
 }
 
+func (s *Scanner) SetIncludeIndirectDependencies(include bool) {
+	s.includeIndirectDependencies = include
+}
+
+
 func (s *Scanner) Scan() error {
 	// Check if go.mod exists
 	goModPath := filepath.Join(s.projectPath, "go.mod")
 	if _, err := os.Stat(goModPath); err != nil {
 		eslog.Errorf("go.mod not found at %s", goModPath)
 		return fmt.Errorf("go.mod not found at %s", goModPath)
+	}
+
+	// Get direct dependencies if not including indirect
+	var directDeps map[string]bool
+	if !s.includeIndirectDependencies {
+		var err error
+		directDeps, err = s.getDirectDependencies()
+		if err != nil {
+			eslog.Warnf("Failed to get direct dependencies list, will scan all: %v", err)
+			directDeps = make(map[string]bool)
+		}
 	}
 
 	// Get all dependencies with go list
@@ -96,6 +115,11 @@ func (s *Scanner) Scan() error {
 
 		if dep.Main {
 			continue // Skip main module
+		}
+
+		// Skip indirect dependencies if not including them
+		if !s.includeIndirectDependencies && len(directDeps) > 0 && !directDeps[dep.Path] {
+			continue
 		}
 
 		dependency := Dependency{
@@ -215,4 +239,38 @@ func (s *Scanner) GetInactiveDependencies() []Dependency {
 
 func (s *Scanner) GetResults() *ScanResult {
 	return s.result
+}
+
+// getDirectDependencies returns a map of direct dependency paths
+func (s *Scanner) getDirectDependencies() (map[string]bool, error) {
+	cmd := exec.Command("go", "mod", "graph")
+	cmd.Dir = s.projectPath
+
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get module graph: %w", err)
+	}
+
+	directDeps := make(map[string]bool)
+	scanner := bufio.NewScanner(bytes.NewReader(output))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line == "" {
+			continue
+		}
+		// Format: module@version direct-dep@version
+		// We only care about direct deps (from the root module)
+		parts := bytes.Fields([]byte(line))
+		if len(parts) >= 2 {
+			// Mark as direct dependency
+			depPath := string(parts[1])
+			// Remove version suffix if present
+			if idx := bytes.IndexByte(parts[1], '@'); idx >= 0 {
+				depPath = string(parts[1][:idx])
+			}
+			directDeps[depPath] = true
+		}
+	}
+
+	return directDeps, nil
 }

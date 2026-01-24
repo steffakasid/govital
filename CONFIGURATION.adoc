@@ -27,6 +27,13 @@ Govital supports flexible configuration through multiple methods with a clear pr
 * *Default*: 90 (3 months)
 * *Note*: Currently a placeholder for future enhancement (not actively used yet)
 
+==== `include_indirect_dependencies`
+
+* *Description*: Whether to include indirect (transitive) dependencies in the scan
+* *Type*: Boolean
+* *Default*: `false` (only scan direct dependencies)
+* *Note*: Including indirect dependencies can significantly increase scan time for large projects
+
 ==== `log_level`
 
 * *Description*: Logging verbosity
@@ -55,6 +62,7 @@ govital scan --project-path /path/to/project --stale-threshold 90 --log-level de
 Available flags:
 
 * `-t, --stale-threshold int`: Days before marking as stale (default 30)
+* `-i, --include-indirect`: Include indirect (transitive) dependencies (default false)
 * `-p, --project-path string`: Path to scan (default ".")
 * `-l, --log-level string`: Logging level (default "info")
 
@@ -80,6 +88,9 @@ scanner:
   
   # Days for active maintenance threshold
   active_threshold_days: 90
+
+  # Include indirect (transitive) dependencies
+  include_indirect_dependencies: false
 ----
 
 === 3. Environment Variables

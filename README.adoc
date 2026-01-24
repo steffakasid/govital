@@ -71,12 +71,23 @@ govital scan --project-path /path/to/project
 
 === Set Stale Threshold
 
-Configure when dependencies are considered inactive (default: 365 days):
+Configure when dependencies are considered inactive (default: 30 days):
 
 [source,bash]
 ----
 govital scan --stale-threshold 180
 ----
+
+=== Include Indirect Dependencies
+
+By default, only direct dependencies are scanned. To include indirect (transitive) dependencies:
+
+[source,bash]
+----
+govital scan --include-indirect
+----
+
+This is useful for analyzing the full dependency tree but can be slower for large projects.
 
 === Log Levels
 

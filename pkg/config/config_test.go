@@ -227,3 +227,42 @@ func TestSetActiveThresholdDays(t *testing.T) {
 
 	assert.Equal(t, 60, result)
 }
+
+func TestGetIncludeIndirectDependencies(t *testing.T) {
+	tests := []struct {
+		name        string
+		configValue bool
+		expected    bool
+	}{
+		{
+			name:        "default false (only direct)",
+			configValue: false,
+			expected:    false,
+		},
+		{
+			name:        "true (include indirect)",
+			configValue: true,
+			expected:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := NewConfig()
+			cfg.viper.Set("scanner.include_indirect_dependencies", tt.configValue)
+
+			result := cfg.GetIncludeIndirectDependencies()
+
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSetIncludeIndirectDependencies(t *testing.T) {
+	cfg := NewConfig()
+	cfg.SetIncludeIndirectDependencies(true)
+
+	result := cfg.GetIncludeIndirectDependencies()
+
+	assert.True(t, result)
+}

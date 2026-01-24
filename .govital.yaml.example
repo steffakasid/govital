@@ -13,3 +13,7 @@ scanner:
   # Number of days a dependency must have been updated within to be considered actively maintained
   # Default: 90 days (3 months)
   active_threshold_days: 90
+
+  # Whether to include indirect (transitive) dependencies in the scan
+  # Default: false (only scan direct dependencies)
+  include_indirect_dependencies: false

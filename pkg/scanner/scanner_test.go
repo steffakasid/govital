@@ -155,5 +155,5 @@ func TestScanResultSummary(t *testing.T) {
 
 	assert.NotNil(t, result.Summary)
 	assert.Equal(t, 0, result.Summary.Total)
-	assert.Equal(t, 365, result.Summary.StaleThresholdDays)
+	assert.Equal(t, 30, result.Summary.StaleThresholdDays)
 }

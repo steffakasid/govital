@@ -35,6 +35,7 @@ func (c *Config) Init() {
 	c.viper.SetDefault("log_level", "info")
 	c.viper.SetDefault("scanner.stale_threshold_days", 30)
 	c.viper.SetDefault("scanner.active_threshold_days", 90)
+	c.viper.SetDefault("scanner.include_indirect_dependencies", false)
 
 	// Read config file
 	if err := c.viper.ReadInConfig(); err != nil {
@@ -90,4 +91,15 @@ func (c *Config) SetStaleThresholdDays(days int) {
 // SetActiveThresholdDays sets the active threshold in the config.
 func (c *Config) SetActiveThresholdDays(days int) {
 	c.viper.Set("scanner.active_threshold_days", days)
+}
+
+// GetIncludeIndirectDependencies returns whether to include indirect (transitive) dependencies.
+// Default: false (only scan direct dependencies)
+func (c *Config) GetIncludeIndirectDependencies() bool {
+	return c.viper.GetBool("scanner.include_indirect_dependencies")
+}
+
+// SetIncludeIndirectDependencies sets whether to include indirect dependencies.
+func (c *Config) SetIncludeIndirectDependencies(include bool) {
+	c.viper.Set("scanner.include_indirect_dependencies", include)
 }
