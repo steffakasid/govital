@@ -45,6 +45,24 @@ changelog:
       - "^docs:"
       - "^test:"
 
+brews:
+  - repository:
+      owner: steffakasid
+      name: homebrew-govital
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+
+    commit_author:
+      name: goreleaserbot
+      email: goreleaser@steffen-rumpf.de
+
+    commit_msg_template: "Brew formula update for {{ .ProjectName }} version {{ .Tag }}"
+
+    directory: Formula
+
+    homepage: "https://github.com/steffakasid/govital"
+    description: "Go dependency maintenance scanner"
+    license: "Apache-2.0"
+
 release:
   github:
     owner: steffakasid
