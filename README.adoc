@@ -89,6 +89,21 @@ govital scan --include-indirect
 
 This is useful for analyzing the full dependency tree but can be slower for large projects.
 
+=== Parallel Scanning
+
+Control the number of parallel workers for faster scanning (default: 4):
+
+[source,bash]
+----
+# Use 8 workers for faster scanning on powerful hardware
+govital scan --workers 8
+
+# Use 1 worker to minimize resource usage
+govital scan --workers 1
+----
+
+Parallel scanning significantly improves performance on projects with many dependencies.
+
 === Log Levels
 
 Set log level for output:
