@@ -1,0 +1,753 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>cmd: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/steffakasid/govital/cmd/govital/cmd/root.go (0.0%)</option>
+				
+				<option value="file1">github.com/steffakasid/govital/cmd/govital/cmd/scan.go (0.0%)</option>
+				
+				<option value="file2">github.com/steffakasid/govital/cmd/govital/main.go (0.0%)</option>
+				
+				<option value="file3">github.com/steffakasid/govital/pkg/config/config.go (96.8%)</option>
+				
+				<option value="file4">github.com/steffakasid/govital/pkg/scanner/scanner.go (29.5%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package cmd
+
+import (
+        "os"
+
+        "github.com/spf13/cobra"
+        "github.com/steffakasid/eslog"
+        "github.com/steffakasid/govital/pkg/config"
+)
+
+var rootCmd = &amp;cobra.Command{
+        Use:   "govital",
+        Short: "A tool to check if Go dependencies are actively maintained",
+        Long: `govital scans all dependencies of a given Go project and checks if those 
+dependencies are actively maintained and if the used versions are up to date.`,
+}
+
+// Execute adds all child commands to the root command and sets flags appropriately.
+func Execute() <span class="cov0" title="0">{
+        if err := rootCmd.Execute(); err != nil </span><span class="cov0" title="0">{
+                eslog.Errorf("Failed to execute root command: %v", err)
+                os.Exit(1)
+        }</span>
+}
+
+func init() <span class="cov0" title="0">{
+        cfg := config.NewConfig()
+        cobra.OnInitialize(func() </span><span class="cov0" title="0">{
+                cfg.Init()
+                logLevel := cfg.GetLogLevelString()
+                if err := eslog.Logger.SetLogLevel(logLevel); err != nil </span><span class="cov0" title="0">{
+                        eslog.Warnf("Failed to set log level: %v", err)
+                }</span>
+        })
+
+        <span class="cov0" title="0">rootCmd.PersistentFlags().StringP("log-level", "l", "info", "Set log level (debug, info, warn, error)")
+        _ = config.Viper.BindPFlag("log_level", rootCmd.PersistentFlags().Lookup("log-level"))</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package cmd
+
+import (
+        "github.com/spf13/cobra"
+        "github.com/steffakasid/eslog"
+        "github.com/steffakasid/govital/pkg/config"
+        "github.com/steffakasid/govital/pkg/scanner"
+)
+
+var scanCmd = &amp;cobra.Command{
+        Use:   "scan",
+        Short: "Scan Go project dependencies for maintenance status",
+        Long: `Scan all dependencies of a Go project and check if they are 
+actively maintained and if the used versions are up to date.`,
+        RunE: func(cmd *cobra.Command, args []string) error <span class="cov0" title="0">{
+                projectPath, err := cmd.Flags().GetString("project-path")
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">staleThreshold, err := cmd.Flags().GetInt("stale-threshold")
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">includeIndirect, err := cmd.Flags().GetBool("include-indirect")
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">workers, err := cmd.Flags().GetInt("workers")
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">eslog.Infof("Starting dependency scan: %s", projectPath)
+
+                s := scanner.NewScanner(projectPath)
+
+                // Use CLI flag if provided, otherwise use config
+                if cmd.Flags().Changed("stale-threshold") </span><span class="cov0" title="0">{
+                        s.SetStaleThreshold(staleThreshold)
+                }</span> else<span class="cov0" title="0"> {
+                        cfg := config.NewConfig()
+                        s.SetStaleThreshold(cfg.GetStaleThresholdDays())
+                }</span>
+
+                <span class="cov0" title="0">if cmd.Flags().Changed("include-indirect") </span><span class="cov0" title="0">{
+                        s.SetIncludeIndirectDependencies(includeIndirect)
+                }</span> else<span class="cov0" title="0"> {
+                        cfg := config.NewConfig()
+                        s.SetIncludeIndirectDependencies(cfg.GetIncludeIndirectDependencies())
+                }</span>
+
+                <span class="cov0" title="0">if cmd.Flags().Changed("workers") </span><span class="cov0" title="0">{
+                        s.SetWorkers(workers)
+                }</span>
+
+                <span class="cov0" title="0">if err := s.Scan(); err != nil </span><span class="cov0" title="0">{
+                        eslog.Errorf("Scan failed: %v", err)
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">s.PrintResults()
+                return nil</span>
+        },
+}
+
+func init() <span class="cov0" title="0">{
+        rootCmd.AddCommand(scanCmd)
+
+        scanCmd.Flags().StringP("project-path", "p", ".", "Path to the Go project to scan")
+        scanCmd.Flags().IntP("stale-threshold", "t", 30, "Number of days a dependency can be inactive before marked as stale")
+        scanCmd.Flags().BoolP("include-indirect", "i", false, "Include indirect (transitive) dependencies in the scan")
+        scanCmd.Flags().IntP("workers", "w", 4, "Number of parallel workers for scanning dependencies")
+}</span>
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package main
+
+import (
+        "github.com/steffakasid/govital/cmd/govital/cmd"
+)
+
+func main() <span class="cov0" title="0">{
+        cmd.Execute()
+}</pre>
+		
+		<pre class="file" id="file3" style="display: none">package config
+
+import (
+        "log/slog"
+        "os"
+
+        "github.com/spf13/viper"
+        "github.com/steffakasid/eslog"
+)
+
+var Viper *viper.Viper
+
+type Config struct {
+        viper *viper.Viper
+}
+
+func init() <span class="cov8" title="1">{
+        Viper = viper.New()
+}</span>
+
+func NewConfig() *Config <span class="cov8" title="1">{
+        return &amp;Config{
+                viper: Viper,
+        }
+}</span>
+
+func (c *Config) Init() <span class="cov8" title="1">{
+        c.viper.SetConfigName("govital")
+        c.viper.SetConfigType("yaml")
+        c.viper.AddConfigPath(".")
+        c.viper.AddConfigPath("/etc/govital/")
+        c.viper.AddConfigPath(os.ExpandEnv("$HOME/.govital"))
+
+        // Set defaults
+        c.viper.SetDefault("log_level", "info")
+        c.viper.SetDefault("scanner.stale_threshold_days", 30)
+        c.viper.SetDefault("scanner.active_threshold_days", 90)
+        c.viper.SetDefault("scanner.include_indirect_dependencies", false)
+
+        // Read config file
+        if err := c.viper.ReadInConfig(); err != nil </span><span class="cov8" title="1">{
+                if _, ok := err.(viper.ConfigFileNotFoundError); !ok </span><span class="cov0" title="0">{
+                        eslog.Debugf("Error reading config file: %v", err)
+                }</span>
+        }
+}
+
+func (c *Config) GetLogLevel() slog.Level <span class="cov8" title="1">{
+        levelStr := c.viper.GetString("log_level")
+        switch levelStr </span>{
+        case "debug":<span class="cov8" title="1">
+                return slog.LevelDebug</span>
+        case "info":<span class="cov8" title="1">
+                return slog.LevelInfo</span>
+        case "warn":<span class="cov8" title="1">
+                return slog.LevelWarn</span>
+        case "error":<span class="cov8" title="1">
+                return slog.LevelError</span>
+        default:<span class="cov8" title="1">
+                return slog.LevelInfo</span>
+        }
+}
+
+func (c *Config) GetLogLevelString() string <span class="cov8" title="1">{
+        levelStr := c.viper.GetString("log_level")
+        if levelStr == "" </span><span class="cov8" title="1">{
+                return "info"
+        }</span>
+        <span class="cov8" title="1">return levelStr</span>
+}
+
+// Scanner configuration
+
+// GetStaleThresholdDays returns the number of days a dependency can be inactive before being marked as stale.
+// Default: 365 days
+func (c *Config) GetStaleThresholdDays() int <span class="cov8" title="1">{
+        return c.viper.GetInt("scanner.stale_threshold_days")
+}</span>
+
+// GetActiveThresholdDays returns the number of days a dependency must have been updated within to be considered active.
+// Default: 90 days
+func (c *Config) GetActiveThresholdDays() int <span class="cov8" title="1">{
+        return c.viper.GetInt("scanner.active_threshold_days")
+}</span>
+
+// SetStaleThresholdDays sets the stale threshold in the config.
+func (c *Config) SetStaleThresholdDays(days int) <span class="cov8" title="1">{
+        c.viper.Set("scanner.stale_threshold_days", days)
+}</span>
+
+// SetActiveThresholdDays sets the active threshold in the config.
+func (c *Config) SetActiveThresholdDays(days int) <span class="cov8" title="1">{
+        c.viper.Set("scanner.active_threshold_days", days)
+}</span>
+
+// GetIncludeIndirectDependencies returns whether to include indirect (transitive) dependencies.
+// Default: false (only scan direct dependencies)
+func (c *Config) GetIncludeIndirectDependencies() bool <span class="cov8" title="1">{
+        return c.viper.GetBool("scanner.include_indirect_dependencies")
+}</span>
+
+// SetIncludeIndirectDependencies sets whether to include indirect dependencies.
+func (c *Config) SetIncludeIndirectDependencies(include bool) <span class="cov8" title="1">{
+        c.viper.Set("scanner.include_indirect_dependencies", include)
+}</span>
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package scanner
+
+import (
+        "bufio"
+        "bytes"
+        "encoding/json"
+        "fmt"
+        "os"
+        "os/exec"
+        "path/filepath"
+        "strings"
+        "sync"
+        "time"
+
+        "github.com/steffakasid/eslog"
+)
+
+type Dependency struct {
+        Path                string
+        Version             string
+        Update              string
+        Latest              string
+        Error               string
+        LastCommitTime      time.Time
+        IsActive            bool
+        DaysSinceLastCommit int
+}
+
+type ScanResult struct {
+        ProjectPath  string
+        Dependencies []Dependency
+        Summary      struct {
+                Total              int
+                Updated            int
+                Outdated           int
+                Errors             int
+                Inactive           int
+                StaleThresholdDays int
+        }
+}
+
+type Scanner struct {
+        projectPath                 string
+        result                      *ScanResult
+        staleThresholdDays          int
+        includeIndirectDependencies bool
+        workers                     int
+        resultMutex                 *sync.Mutex
+}
+
+func NewScanner(projectPath string) *Scanner <span class="cov8" title="1">{
+        result := &amp;ScanResult{
+                ProjectPath:  projectPath,
+                Dependencies: make([]Dependency, 0),
+        }
+        result.Summary.StaleThresholdDays = 30 // Set default threshold in result
+
+        return &amp;Scanner{
+                projectPath:                 projectPath,
+                staleThresholdDays:          30,
+                includeIndirectDependencies: false,
+                workers:                     4,
+                resultMutex:                 &amp;sync.Mutex{},
+                result:                      result,
+        }
+}</span>
+
+func (s *Scanner) SetWorkers(count int) <span class="cov8" title="1">{
+        if count &lt; 1 </span><span class="cov8" title="1">{
+                count = 1
+        }</span>
+        <span class="cov8" title="1">s.workers = count</span>
+}
+
+func (s *Scanner) SetStaleThreshold(days int) <span class="cov8" title="1">{
+        s.staleThresholdDays = days
+        s.result.Summary.StaleThresholdDays = days
+}</span>
+
+func (s *Scanner) SetIncludeIndirectDependencies(include bool) <span class="cov8" title="1">{
+        s.includeIndirectDependencies = include
+}</span>
+
+func (s *Scanner) Scan() error <span class="cov8" title="1">{
+        // Check if go.mod exists
+        goModPath := filepath.Join(s.projectPath, "go.mod")
+        if _, err := os.Stat(goModPath); err != nil </span><span class="cov8" title="1">{
+                eslog.Errorf("go.mod not found at %s", goModPath)
+                return fmt.Errorf("go.mod not found at %s", goModPath)
+        }</span>
+
+        // Get direct dependencies if not including indirect
+        <span class="cov0" title="0">var directDeps map[string]bool
+        if !s.includeIndirectDependencies </span><span class="cov0" title="0">{
+                var err error
+                directDeps, err = s.getDirectDependencies()
+                if err != nil </span><span class="cov0" title="0">{
+                        eslog.Warnf("Failed to get direct dependencies list, will scan all: %v", err)
+                        directDeps = make(map[string]bool)
+                }</span>
+        }
+
+        // Get all dependencies with go list
+        <span class="cov0" title="0">cmd := exec.Command("go", "list", "-json", "-m", "all")
+        cmd.Dir = s.projectPath
+
+        output, err := cmd.Output()
+        if err != nil </span><span class="cov0" title="0">{
+                eslog.Errorf("Failed to list dependencies: %v", err)
+                return fmt.Errorf("failed to list dependencies: %w", err)
+        }</span>
+
+        // Collect dependencies to scan
+        <span class="cov0" title="0">var depsToScan []Dependency
+        decoder := json.NewDecoder(bytes.NewReader(output))
+        for decoder.More() </span><span class="cov0" title="0">{
+                var dep struct {
+                        Path    string
+                        Version string
+                        Main    bool
+                }
+
+                if err := decoder.Decode(&amp;dep); err != nil </span><span class="cov0" title="0">{
+                        eslog.Errorf("Failed to decode dependency: %v", err)
+                        s.result.Summary.Errors++
+                        continue</span>
+                }
+
+                <span class="cov0" title="0">if dep.Main </span><span class="cov0" title="0">{
+                        continue</span> // Skip main module
+                }
+
+                // Skip indirect dependencies if not including them
+                <span class="cov0" title="0">if !s.includeIndirectDependencies &amp;&amp; !directDeps[dep.Path] </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+
+                <span class="cov0" title="0">depsToScan = append(depsToScan, Dependency{
+                        Path:     dep.Path,
+                        Version:  dep.Version,
+                        IsActive: true,
+                })</span>
+        }
+
+        // Scan dependencies in parallel
+        <span class="cov0" title="0">s.scanParallel(depsToScan)
+
+        s.result.Summary.StaleThresholdDays = s.staleThresholdDays
+        eslog.Infof("Dependencies found: %d (scanned with %d workers)", s.result.Summary.Total, s.workers)
+        return nil</span>
+}
+
+// scanParallel scans dependencies in parallel using worker goroutines
+func (s *Scanner) scanParallel(depsToScan []Dependency) <span class="cov0" title="0">{
+        var wg sync.WaitGroup
+        depChan := make(chan *Dependency, len(depsToScan))
+
+        // Start worker goroutines
+        for i := 0; i &lt; s.workers; i++ </span><span class="cov0" title="0">{
+                wg.Add(1)
+                go func() </span><span class="cov0" title="0">{
+                        defer wg.Done()
+                        for dep := range depChan </span><span class="cov0" title="0">{
+                                // Check maintenance status
+                                if err := s.checkMaintenanceStatus(dep); err != nil </span><span class="cov0" title="0">{
+                                        eslog.Debugf("Failed to check maintenance status for %s: %v", dep.Path, err)
+                                }</span>
+
+                                // Append result safely
+                                <span class="cov0" title="0">s.resultMutex.Lock()
+                                s.result.Dependencies = append(s.result.Dependencies, *dep)
+                                s.result.Summary.Total++
+                                if !dep.IsActive </span><span class="cov0" title="0">{
+                                        s.result.Summary.Inactive++
+                                }</span>
+                                <span class="cov0" title="0">s.resultMutex.Unlock()</span>
+                        }
+                }()
+        }
+
+        // Send dependencies to be scanned
+        <span class="cov0" title="0">for i := range depsToScan </span><span class="cov0" title="0">{
+                depChan &lt;- &amp;depsToScan[i]
+        }</span>
+        <span class="cov0" title="0">close(depChan)
+
+        // Wait for all workers to finish
+        wg.Wait()</span>
+}
+
+func (s *Scanner) checkMaintenanceStatus(dep *Dependency) error <span class="cov8" title="1">{
+        // Get the git repository URL from the module
+        repoURL, commitHash, err := s.getRepositoryInfo(dep.Path, dep.Version)
+        if err != nil </span><span class="cov8" title="1">{
+                eslog.Warnf("Failed to get repository info for %s: %v", dep.Path, err)
+                dep.IsActive = true // Assume active if we can't check
+                return nil
+        }</span>
+
+        // Get the actual commit time from git
+        <span class="cov0" title="0">commitTime, err := s.getCommitTime(repoURL, commitHash)
+        if err != nil </span><span class="cov0" title="0">{
+                eslog.Warnf("Failed to get commit time for %s: %v", dep.Path, err)
+                dep.IsActive = true // Assume active if we can't check
+                return nil
+        }</span>
+
+        <span class="cov0" title="0">dep.LastCommitTime = commitTime
+        daysSinceCommit := int(time.Since(dep.LastCommitTime).Hours() / 24)
+        dep.DaysSinceLastCommit = daysSinceCommit
+
+        if daysSinceCommit &gt; s.staleThresholdDays </span><span class="cov0" title="0">{
+                dep.IsActive = false
+        }</span>
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+// getRepositoryInfo extracts the git repository URL and commit hash for a specific version
+func (s *Scanner) getRepositoryInfo(modulePath, version string) (repoURL, commitHash string, err error) <span class="cov8" title="1">{
+        // Use go list to get detailed information about the module
+        cmd := exec.Command("go", "list", "-json", modulePath+"@"+version)
+        cmd.Dir = s.projectPath
+
+        output, err := cmd.Output()
+        if err != nil </span><span class="cov8" title="1">{
+                return "", "", fmt.Errorf("failed to list module info: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">var modInfo struct {
+                Module struct {
+                        Path    string
+                        Version string
+                }
+                Error interface{}
+        }
+
+        if err := json.Unmarshal(output, &amp;modInfo); err != nil </span><span class="cov0" title="0">{
+                return "", "", fmt.Errorf("failed to unmarshal module info: %w", err)
+        }</span>
+
+        // Get module source info using go mod download
+        <span class="cov0" title="0">dlCmd := exec.Command("go", "mod", "download", "-json", modulePath+"@"+version)
+        dlCmd.Dir = s.projectPath
+
+        dlOutput, err := dlCmd.Output()
+        if err != nil </span><span class="cov0" title="0">{
+                return "", "", fmt.Errorf("failed to download module info: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">var downloadInfo struct {
+                Dir string `json:"Dir"`
+        }
+
+        if err := json.Unmarshal(dlOutput, &amp;downloadInfo); err != nil </span><span class="cov0" title="0">{
+                return "", "", fmt.Errorf("failed to unmarshal download info: %w", err)
+        }</span>
+
+        // Note: We could read go.mod to find repository URL, but for now
+        // we construct it directly from the module path
+
+        // Extract commit hash from version (e.g., v1.2.3-20240125abcdef1 or v1.2.3)
+        // For tagged versions, we need to construct the repo URL
+        <span class="cov0" title="0">repoURL = "https://" + modulePath
+
+        // For pseudo-versions, extract the commit hash
+        if len(version) &gt; 0 &amp;&amp; version[0] == 'v' </span><span class="cov0" title="0">{
+                parts := version[1:] // Remove 'v'
+                if idx := strings.LastIndex(parts, "-"); idx &gt; 0 </span><span class="cov0" title="0">{
+                        // Pseudo-version format: v1.0.0-20240125abcdef1
+                        // Extract the commit hash (usually 12 chars after the last dash)
+                        suffix := parts[idx+1:]
+                        if len(suffix) &gt;= 12 </span><span class="cov0" title="0">{
+                                commitHash = suffix[len(suffix)-12:] // Last 12 chars is the commit hash
+                        }</span>
+                }
+        }
+
+        <span class="cov0" title="0">return repoURL, commitHash, nil</span>
+}
+
+// getCommitTime fetches the actual commit timestamp from a git repository
+func (s *Scanner) getCommitTime(repoURL, commitHash string) (time.Time, error) <span class="cov8" title="1">{
+        if commitHash == "" </span><span class="cov8" title="1">{
+                // If no commit hash, use a default or return current time
+                return time.Now(), nil
+        }</span>
+
+        // Use git clone and git show to fetch the actual commit timestamp
+        <span class="cov0" title="0">tempDir, err := os.MkdirTemp("", "govital-repo-")
+        if err != nil </span><span class="cov0" title="0">{
+                return time.Now(), err
+        }</span>
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if err := os.RemoveAll(tempDir); err != nil </span><span class="cov0" title="0">{
+                        eslog.Warnf("Failed to remove temporary directory: %v", err)
+                }</span>
+        }()
+
+        // Clone the repository
+        <span class="cov0" title="0">cloneCmd := exec.Command("git", "clone", "--quiet", "--depth", "1", repoURL, tempDir)
+        if err := cloneCmd.Run(); err != nil </span><span class="cov0" title="0">{
+                return s.getCommitTimeViaHTTP(repoURL, commitHash)
+        }</span>
+
+        // Get commit timestamp using git show
+        <span class="cov0" title="0">showCmd := exec.Command("git", "show", "-s", "--format=%cI", commitHash)
+        showCmd.Dir = tempDir
+
+        timeOutput, err := showCmd.Output()
+        if err != nil </span><span class="cov0" title="0">{
+                return time.Now(), fmt.Errorf("failed to get commit time: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">commitTime, err := time.Parse(time.RFC3339, strings.TrimSpace(string(timeOutput)))
+        if err != nil </span><span class="cov0" title="0">{
+                return time.Now(), fmt.Errorf("failed to parse commit time: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">return commitTime, nil</span>
+}
+
+// getCommitTimeViaHTTP attempts to get commit time via GitHub API or other HTTP methods
+func (s *Scanner) getCommitTimeViaHTTP(repoURL, commitHash string) (time.Time, error) <span class="cov8" title="1">{
+        // For GitHub repositories, we could use the GitHub API, but that requires auth
+        // For now, return the current time as we can't determine it
+        // In a real implementation, this could integrate with GitHub API using tokens
+        eslog.Debugf("Cannot determine commit time for %s@%s via HTTP, assuming recently active", repoURL, commitHash)
+        return time.Now(), nil
+}</span>
+
+func (s *Scanner) PrintResults() <span class="cov8" title="1">{
+        fmt.Printf("\n=== Govital Dependency Scan Results ===\n")
+        fmt.Printf("Project: %s\n", s.projectPath)
+        fmt.Printf("Stale Threshold: %d days\n\n", s.staleThresholdDays)
+
+        fmt.Printf("Summary:\n")
+        fmt.Printf("  Total Dependencies:        %d\n", s.result.Summary.Total)
+        fmt.Printf("  Inactive Dependencies:     %d\n", s.result.Summary.Inactive)
+        fmt.Printf("  Errors:                    %d\n", s.result.Summary.Errors)
+        fmt.Printf("\nDependencies:\n")
+
+        for _, dep := range s.result.Dependencies </span><span class="cov8" title="1">{
+                status := "✓ Active"
+                if !dep.IsActive </span><span class="cov8" title="1">{
+                        status = "✗ Inactive"
+                }</span>
+
+                <span class="cov8" title="1">if dep.Error != "" </span><span class="cov0" title="0">{
+                        fmt.Printf("  - %s@%s [ERROR: %s]\n", dep.Path, dep.Version, dep.Error)
+                }</span> else<span class="cov8" title="1"> if !dep.LastCommitTime.IsZero() </span><span class="cov8" title="1">{
+                        fmt.Printf("  - %s@%s [%s] (last commit: %d days ago)\n",
+                                dep.Path, dep.Version, status, dep.DaysSinceLastCommit)
+                }</span> else<span class="cov0" title="0"> {
+                        fmt.Printf("  - %s@%s [%s]\n", dep.Path, dep.Version, status)
+                }</span>
+        }
+        <span class="cov8" title="1">fmt.Printf("\n")</span>
+}
+
+func (s *Scanner) GetInactiveDependencies() []Dependency <span class="cov8" title="1">{
+        var inactive []Dependency
+        for _, dep := range s.result.Dependencies </span><span class="cov8" title="1">{
+                if !dep.IsActive </span><span class="cov8" title="1">{
+                        inactive = append(inactive, dep)
+                }</span>
+        }
+        <span class="cov8" title="1">return inactive</span>
+}
+
+func (s *Scanner) GetResults() *ScanResult <span class="cov8" title="1">{
+        return s.result
+}</span>
+
+// getDirectDependencies returns a map of direct dependency paths
+func (s *Scanner) getDirectDependencies() (map[string]bool, error) <span class="cov0" title="0">{
+        cmd := exec.Command("go", "mod", "graph")
+        cmd.Dir = s.projectPath
+
+        output, err := cmd.Output()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("failed to get module graph: %w", err)
+        }</span>
+
+        <span class="cov0" title="0">directDeps := make(map[string]bool)
+        scanner := bufio.NewScanner(bytes.NewReader(output))
+        for scanner.Scan() </span><span class="cov0" title="0">{
+                line := scanner.Text()
+                if line == "" </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                // Format: module@version direct-dep@version
+                // We only care about direct deps (from the root module)
+                <span class="cov0" title="0">parts := bytes.Fields([]byte(line))
+                if len(parts) &gt;= 2 </span><span class="cov0" title="0">{
+                        // Mark as direct dependency
+                        depPath := string(parts[1])
+                        // Remove version suffix if present
+                        if idx := bytes.IndexByte(parts[1], '@'); idx &gt;= 0 </span><span class="cov0" title="0">{
+                                depPath = string(parts[1][:idx])
+                        }</span>
+                        <span class="cov0" title="0">directDeps[depPath] = true</span>
+                }
+        }
+
+        <span class="cov0" title="0">return directDeps, nil</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
