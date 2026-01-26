@@ -65,6 +65,30 @@ func NewScanner(projectPath string) *Scanner {
 	}
 }
 
+// isStale returns true if a dependency is stale based on days since last commit
+func (s *Scanner) isStale(daysSinceCommit int) bool {
+	return daysSinceCommit > s.staleThresholdDays
+}
+
+// extractCommitHash extracts the commit hash from a pseudo-version string
+func (s *Scanner) extractCommitHash(version string) string {
+	if len(version) == 0 || version[0] != 'v' {
+		return ""
+	}
+
+	parts := version[1:] // Remove 'v'
+	for i := len(parts) - 1; i >= 0; i-- {
+		if parts[i] == '-' {
+			suffix := parts[i+1:]
+			if len(suffix) >= 12 {
+				return suffix[len(suffix)-12:] // Last 12 chars is the commit hash
+			}
+			break
+		}
+	}
+	return ""
+}
+
 func (s *Scanner) SetWorkers(count int) {
 	if count < 1 {
 		count = 1
@@ -209,7 +233,7 @@ func (s *Scanner) checkMaintenanceStatus(dep *Dependency) error {
 	daysSinceCommit := int(time.Since(dep.LastCommitTime).Hours() / 24)
 	dep.DaysSinceLastCommit = daysSinceCommit
 
-	if daysSinceCommit > s.staleThresholdDays {
+	if s.isStale(daysSinceCommit) {
 		dep.IsActive = false
 	}
 
@@ -262,19 +286,7 @@ func (s *Scanner) getRepositoryInfo(modulePath, version string) (repoURL, commit
 	// Extract commit hash from version (e.g., v1.2.3-20240125abcdef1 or v1.2.3)
 	// For tagged versions, we need to construct the repo URL
 	repoURL = "https://" + modulePath
-
-	// For pseudo-versions, extract the commit hash
-	if len(version) > 0 && version[0] == 'v' {
-		parts := version[1:] // Remove 'v'
-		if idx := strings.LastIndex(parts, "-"); idx > 0 {
-			// Pseudo-version format: v1.0.0-20240125abcdef1
-			// Extract the commit hash (usually 12 chars after the last dash)
-			suffix := parts[idx+1:]
-			if len(suffix) >= 12 {
-				commitHash = suffix[len(suffix)-12:] // Last 12 chars is the commit hash
-			}
-		}
-	}
+	commitHash = s.extractCommitHash(version)
 
 	return repoURL, commitHash, nil
 }
