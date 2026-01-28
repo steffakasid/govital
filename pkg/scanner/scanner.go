@@ -25,6 +25,7 @@ type Dependency struct {
 	Error                string
 	LastReleaseTime      time.Time
 	IsActive             bool
+	IsIndirect           bool
 	DaysSinceLastRelease int
 }
 
@@ -58,8 +59,8 @@ func NewScanner(projectPath string) *Scanner {
 	result.Summary.StaleThresholdDays = 180 // Set default threshold in result
 
 	return &Scanner{
-		projectPath:                projectPath,
-		staleThresholdDays:         180,
+		projectPath:                 projectPath,
+		staleThresholdDays:          180,
 		includeIndirectDependencies: false,
 		workers:                     4,
 		resultMutex:                 &sync.Mutex{},
@@ -152,9 +153,10 @@ func (s *Scanner) Scan() error {
 		}
 
 		depsToScan = append(depsToScan, Dependency{
-			Path:     dep.Path,
-			Version:  dep.Version,
-			IsActive: true,
+			Path:       dep.Path,
+			Version:    dep.Version,
+			IsActive:   true,
+			IsIndirect: dep.Indirect,
 		})
 	}
 
@@ -311,25 +313,73 @@ func (s *Scanner) PrintResults() {
 	fmt.Printf("Project: %s\n", s.projectPath)
 	fmt.Printf("Stale Threshold: %d days\n\n", s.staleThresholdDays)
 
+	// Separate direct and indirect dependencies
+	var directDeps, indirectDeps []Dependency
+	for _, dep := range s.result.Dependencies {
+		if dep.IsIndirect {
+			indirectDeps = append(indirectDeps, dep)
+		} else {
+			directDeps = append(directDeps, dep)
+		}
+	}
+
+	// Count inactive dependencies by type
+	directInactive := 0
+	indirectInactive := 0
+	for _, dep := range directDeps {
+		if !dep.IsActive {
+			directInactive++
+		}
+	}
+	for _, dep := range indirectDeps {
+		if !dep.IsActive {
+			indirectInactive++
+		}
+	}
+
 	fmt.Printf("Summary:\n")
 	fmt.Printf("  Total Dependencies:        %d\n", s.result.Summary.Total)
-	fmt.Printf("  Inactive Dependencies:     %d\n", s.result.Summary.Inactive)
+	fmt.Printf("  Inactive Dependencies:     %d (Direct: %d, Indirect: %d)\n", s.result.Summary.Inactive, directInactive, indirectInactive)
 	fmt.Printf("  Errors:                    %d\n", s.result.Summary.Errors)
 	fmt.Printf("\nDependencies:\n")
 
-	for _, dep := range s.result.Dependencies {
-		status := "✓ Active"
-		if !dep.IsActive {
-			status = "✗ Inactive"
-		}
+	// Print direct dependencies
+	if len(directDeps) > 0 {
+		fmt.Printf("\nDirect Dependencies (%d):\n", len(directDeps))
+		for _, dep := range directDeps {
+			status := "✓ Active"
+			if !dep.IsActive {
+				status = "✗ Inactive"
+			}
 
-		if dep.Error != "" {
-			fmt.Printf("  - %s@%s [ERROR: %s]\n", dep.Path, dep.Version, dep.Error)
-		} else if !dep.LastReleaseTime.IsZero() {
-			fmt.Printf("  - %s@%s [%s] (last release: %d days ago)\n",
-				dep.Path, dep.Version, status, dep.DaysSinceLastRelease)
-		} else {
-			fmt.Printf("  - %s@%s [%s]\n", dep.Path, dep.Version, status)
+			if dep.Error != "" {
+				fmt.Printf("  - %s@%s [ERROR: %s]\n", dep.Path, dep.Version, dep.Error)
+			} else if !dep.LastReleaseTime.IsZero() {
+				fmt.Printf("  - %s@%s [%s] (last release: %d days ago)\n",
+					dep.Path, dep.Version, status, dep.DaysSinceLastRelease)
+			} else {
+				fmt.Printf("  - %s@%s [%s]\n", dep.Path, dep.Version, status)
+			}
+		}
+	}
+
+	// Print indirect dependencies
+	if len(indirectDeps) > 0 {
+		fmt.Printf("\nIndirect Dependencies (%d):\n", len(indirectDeps))
+		for _, dep := range indirectDeps {
+			status := "✓ Active"
+			if !dep.IsActive {
+				status = "✗ Inactive"
+			}
+
+			if dep.Error != "" {
+				fmt.Printf("  - %s@%s [ERROR: %s]\n", dep.Path, dep.Version, dep.Error)
+			} else if !dep.LastReleaseTime.IsZero() {
+				fmt.Printf("  - %s@%s [%s] (last release: %d days ago)\n",
+					dep.Path, dep.Version, status, dep.DaysSinceLastRelease)
+			} else {
+				fmt.Printf("  - %s@%s [%s]\n", dep.Path, dep.Version, status)
+			}
 		}
 	}
 	fmt.Printf("\n")
