@@ -15,7 +15,7 @@ func TestNewScanner(t *testing.T) {
 
 	assert.NotNil(t, scanner)
 	assert.Equal(t, projectPath, scanner.projectPath)
-	assert.Equal(t, 30, scanner.staleThresholdDays)
+	assert.Equal(t, 180, scanner.staleThresholdDays)
 	assert.NotNil(t, scanner.result)
 	assert.Equal(t, projectPath, scanner.result.ProjectPath)
 	assert.Equal(t, 0, len(scanner.result.Dependencies))
@@ -157,7 +157,7 @@ func TestScanResultSummary(t *testing.T) {
 
 	assert.NotNil(t, result.Summary)
 	assert.Equal(t, 0, result.Summary.Total)
-	assert.Equal(t, 30, result.Summary.StaleThresholdDays)
+	assert.Equal(t, 180, result.Summary.StaleThresholdDays)
 }
 
 func TestSetWorkers(t *testing.T) {
@@ -409,7 +409,7 @@ func TestScanResultSummaryFields(t *testing.T) {
 	assert.Equal(t, 0, result.Summary.Outdated)
 	assert.Equal(t, 0, result.Summary.Errors)
 	assert.Equal(t, 0, result.Summary.Inactive)
-	assert.Equal(t, 30, result.Summary.StaleThresholdDays)
+	assert.Equal(t, 180, result.Summary.StaleThresholdDays)
 }
 
 func TestMultipleThresholdUpdates(t *testing.T) {

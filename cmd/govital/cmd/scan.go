@@ -70,7 +70,7 @@ func init() {
 	rootCmd.AddCommand(scanCmd)
 
 	scanCmd.Flags().StringP("project-path", "p", ".", "Path to the Go project to scan")
-	scanCmd.Flags().IntP("stale-threshold", "t", 30, "Number of days a dependency can be inactive before marked as stale")
+	scanCmd.Flags().IntP("stale-threshold", "t", 180, "Number of days a dependency can be inactive before marked as stale")
 	scanCmd.Flags().BoolP("include-indirect", "i", false, "Include indirect (transitive) dependencies in the scan")
 	scanCmd.Flags().IntP("workers", "w", 4, "Number of parallel workers for scanning dependencies")
 }

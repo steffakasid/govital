@@ -55,11 +55,11 @@ func NewScanner(projectPath string) *Scanner {
 		ProjectPath:  projectPath,
 		Dependencies: make([]Dependency, 0),
 	}
-	result.Summary.StaleThresholdDays = 30 // Set default threshold in result
+	result.Summary.StaleThresholdDays = 180 // Set default threshold in result
 
 	return &Scanner{
-		projectPath:                 projectPath,
-		staleThresholdDays:          30,
+		projectPath:                projectPath,
+		staleThresholdDays:         180,
 		includeIndirectDependencies: false,
 		workers:                     4,
 		resultMutex:                 &sync.Mutex{},
