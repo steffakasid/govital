@@ -356,6 +356,7 @@ func TestPrintResults(t *testing.T) {
 			IsActive:            true,
 			DaysSinceLastRelease: 10,
 			LastReleaseTime:      time.Now().AddDate(0, 0, -10),
+			IsIndirect:           false,
 		},
 		{
 			Path:                "github.com/example/inactive",
@@ -363,6 +364,7 @@ func TestPrintResults(t *testing.T) {
 			IsActive:            false,
 			DaysSinceLastRelease: 400,
 			LastReleaseTime:      time.Now().AddDate(0, 0, -400),
+			IsIndirect:           true,
 		},
 	}
 	scanner.result.Summary.Total = 2
