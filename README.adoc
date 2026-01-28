@@ -115,39 +115,9 @@ govital scan --log-level debug
 
 Available levels: `debug`, `info`, `warn`, `error`
 
-=== Configuration
+== Configuration
 
-Create a `govital.yaml` in your project root, `~/.govital/`, or `/etc/govital/`:
-
-[source,yaml]
-----
-log_level: info  # Options: debug, info, warn, error
-
-scanner:
-  # Days a dependency can be inactive before marked as stale (default: 365)
-  stale_threshold_days: 365
-
-  # Days a dependency must be updated within to be considered active (default: 90)
-  active_threshold_days: 90
-----
-
-You can also use CLI flags to override config file settings:
-
-[source,bash]
-----
-# Override stale threshold via CLI
-govital scan --stale-threshold 180
-
-# Override log level
-govital scan --log-level debug
-----
-
-=== Configuration Priority
-
-1. CLI flags (highest priority)
-2. Config file (`govital.yaml`)
-3. Environment variables (future support)
-4. Defaults (lowest priority)
+include::CONFIGURATION.adoc[leveloffset=+1]
 
 == License
 
