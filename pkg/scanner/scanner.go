@@ -1,10 +1,12 @@
 package scanner
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -113,17 +115,6 @@ func (s *Scanner) Scan() error {
 		return fmt.Errorf("go.mod not found at %s", goModPath)
 	}
 
-	// Get direct dependencies if not including indirect
-	var directDeps map[string]bool
-	if !s.includeIndirectDependencies {
-		var err error
-		directDeps, err = s.getDirectDependencies()
-		if err != nil {
-			eslog.Warnf("Failed to get direct dependencies list, will scan all: %v", err)
-			directDeps = make(map[string]bool)
-		}
-	}
-
 	// Get all dependencies with go list
 	cmd := exec.Command("go", "list", "-json", "-m", "all")
 	cmd.Dir = s.projectPath
@@ -139,9 +130,10 @@ func (s *Scanner) Scan() error {
 	decoder := json.NewDecoder(bytes.NewReader(output))
 	for decoder.More() {
 		var dep struct {
-			Path    string
-			Version string
-			Main    bool
+			Path     string
+			Version  string
+			Main     bool
+			Indirect bool
 		}
 
 		if err := decoder.Decode(&dep); err != nil {
@@ -155,7 +147,7 @@ func (s *Scanner) Scan() error {
 		}
 
 		// Skip indirect dependencies if not including them
-		if !s.includeIndirectDependencies && !directDeps[dep.Path] {
+		if !s.includeIndirectDependencies && dep.Indirect {
 			continue
 		}
 
@@ -213,18 +205,10 @@ func (s *Scanner) scanParallel(depsToScan []Dependency) {
 }
 
 func (s *Scanner) checkMaintenanceStatus(dep *Dependency) error {
-	// Get the git repository URL from the module
-	repoURL, commitHash, err := s.getRepositoryInfo(dep.Path, dep.Version)
+	// Get version info from Go proxy
+	commitTime, err := s.getVersionInfoFromProxy(dep.Path, dep.Version)
 	if err != nil {
-		eslog.Warnf("Failed to get repository info for %s: %v", dep.Path, err)
-		dep.IsActive = true // Assume active if we can't check
-		return nil
-	}
-
-	// Get the actual commit time from git
-	commitTime, err := s.getCommitTime(repoURL, commitHash)
-	if err != nil {
-		eslog.Warnf("Failed to get commit time for %s: %v", dep.Path, err)
+		eslog.Warnf("Failed to get version info for %s@%s from proxy: %v", dep.Path, dep.Version, err)
 		dep.IsActive = true // Assume active if we can't check
 		return nil
 	}
@@ -240,105 +224,86 @@ func (s *Scanner) checkMaintenanceStatus(dep *Dependency) error {
 	return nil
 }
 
-// getRepositoryInfo extracts the git repository URL and commit hash for a specific version
-func (s *Scanner) getRepositoryInfo(modulePath, version string) (repoURL, commitHash string, err error) {
-	// Use go list to get detailed information about the module
-	cmd := exec.Command("go", "list", "-json", modulePath+"@"+version)
-	cmd.Dir = s.projectPath
-
-	output, err := cmd.Output()
-	if err != nil {
-		return "", "", fmt.Errorf("failed to list module info: %w", err)
+// getGoProxyURLs returns a list of Go proxy URLs from the GOPROXY environment variable
+// Falls back to proxy.golang.org if GOPROXY is not set
+// Handles multiple proxies separated by commas
+func (s *Scanner) getGoProxyURLs() []string {
+	goproxy := os.Getenv("GOPROXY")
+	if goproxy == "" {
+		return []string{"https://proxy.golang.org"}
 	}
 
-	var modInfo struct {
-		Module struct {
-			Path    string
-			Version string
+	var proxies []string
+	for _, p := range strings.Split(goproxy, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" && p != "direct" {
+			// Remove trailing slash for consistency
+			p = strings.TrimSuffix(p, "/")
+			proxies = append(proxies, p)
 		}
-		Error interface{}
 	}
 
-	if err := json.Unmarshal(output, &modInfo); err != nil {
-		return "", "", fmt.Errorf("failed to unmarshal module info: %w", err)
+	// If no valid proxies found (e.g., only "direct" was specified),
+	// fall back to the default proxy
+	if len(proxies) == 0 {
+		proxies = append(proxies, "https://proxy.golang.org")
 	}
 
-	// Get module source info using go mod download
-	dlCmd := exec.Command("go", "mod", "download", "-json", modulePath+"@"+version)
-	dlCmd.Dir = s.projectPath
-
-	dlOutput, err := dlCmd.Output()
-	if err != nil {
-		return "", "", fmt.Errorf("failed to download module info: %w", err)
-	}
-
-	var downloadInfo struct {
-		Dir string `json:"Dir"`
-	}
-
-	if err := json.Unmarshal(dlOutput, &downloadInfo); err != nil {
-		return "", "", fmt.Errorf("failed to unmarshal download info: %w", err)
-	}
-
-	// Note: We could read go.mod to find repository URL, but for now
-	// we construct it directly from the module path
-
-	// Extract commit hash from version (e.g., v1.2.3-20240125abcdef1 or v1.2.3)
-	// For tagged versions, we need to construct the repo URL
-	repoURL = "https://" + modulePath
-	commitHash = s.extractCommitHash(version)
-
-	return repoURL, commitHash, nil
+	return proxies
 }
 
-// getCommitTime fetches the actual commit timestamp from a git repository
-func (s *Scanner) getCommitTime(repoURL, commitHash string) (time.Time, error) {
-	if commitHash == "" {
-		// If no commit hash, use a default or return current time
-		return time.Now(), nil
-	}
-
-	// Use git clone and git show to fetch the actual commit timestamp
-	tempDir, err := os.MkdirTemp("", "govital-repo-")
-	if err != nil {
-		return time.Now(), err
-	}
-	defer func() {
-		if err := os.RemoveAll(tempDir); err != nil {
-			eslog.Warnf("Failed to remove temporary directory: %v", err)
-		}
-	}()
-
-	// Clone the repository
-	cloneCmd := exec.Command("git", "clone", "--quiet", "--depth", "1", repoURL, tempDir)
-	if err := cloneCmd.Run(); err != nil {
-		return s.getCommitTimeViaHTTP(repoURL, commitHash)
-	}
-
-	// Get commit timestamp using git show
-	showCmd := exec.Command("git", "show", "-s", "--format=%cI", commitHash)
-	showCmd.Dir = tempDir
-
-	timeOutput, err := showCmd.Output()
-	if err != nil {
-		return time.Now(), fmt.Errorf("failed to get commit time: %w", err)
-	}
-
-	commitTime, err := time.Parse(time.RFC3339, strings.TrimSpace(string(timeOutput)))
-	if err != nil {
-		return time.Now(), fmt.Errorf("failed to parse commit time: %w", err)
-	}
-
-	return commitTime, nil
+// versionInfo represents the JSON response from the Go proxy
+type versionInfo struct {
+	Version string    `json:"Version"`
+	Time    time.Time `json:"Time"`
 }
 
-// getCommitTimeViaHTTP attempts to get commit time via GitHub API or other HTTP methods
-func (s *Scanner) getCommitTimeViaHTTP(repoURL, commitHash string) (time.Time, error) {
-	// For GitHub repositories, we could use the GitHub API, but that requires auth
-	// For now, return the current time as we can't determine it
-	// In a real implementation, this could integrate with GitHub API using tokens
-	eslog.Debugf("Cannot determine commit time for %s@%s via HTTP, assuming recently active", repoURL, commitHash)
-	return time.Now(), nil
+// getVersionInfoFromProxy fetches version information from the Go proxy
+// Tries each proxy in order and returns the first successful result
+func (s *Scanner) getVersionInfoFromProxy(modulePath, version string) (time.Time, error) {
+	proxies := s.getGoProxyURLs()
+	var lastErr error
+
+	// Try each proxy in order
+	for i, proxyURL := range proxies {
+		// Construct the proxy URL for the version info endpoint
+		// Format: {GOPROXY}/{modulePath}/@v/{version}.info
+		escapedPath := url.PathEscape(modulePath)
+		infoURL := fmt.Sprintf("%s/%s/@v/%s.info", proxyURL, escapedPath, url.PathEscape(version))
+
+		response, err := http.Get(infoURL)
+		if err != nil {
+			lastErr = fmt.Errorf("proxy %s: %w", proxyURL, err)
+			eslog.Debugf("Failed to fetch from proxy %d/%d (%s): %v", i+1, len(proxies), proxyURL, err)
+			continue
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(response.Body)
+			lastErr = fmt.Errorf("proxy %s returned status %d: %s", proxyURL, response.StatusCode, string(body))
+			eslog.Debugf("Proxy %d/%d (%s) failed: %v", i+1, len(proxies), proxyURL, lastErr)
+			continue
+		}
+
+		// Successfully got response, decode it
+		var info versionInfo
+		if err := json.NewDecoder(response.Body).Decode(&info); err != nil {
+			lastErr = fmt.Errorf("failed to decode version info from proxy %s: %w", proxyURL, err)
+			eslog.Debugf("Failed to decode response from proxy %d/%d (%s): %v", i+1, len(proxies), proxyURL, err)
+			continue
+		}
+
+		// Success!
+		eslog.Debugf("Successfully fetched version info for %s@%s from proxy %d/%d (%s)", modulePath, version, i+1, len(proxies), proxyURL)
+		return info.Time, nil
+	}
+
+	// All proxies failed
+	if lastErr != nil {
+		return time.Time{}, fmt.Errorf("failed to fetch version info from all %d proxies: %w", len(proxies), lastErr)
+	}
+	return time.Time{}, fmt.Errorf("no proxies available")
 }
 
 func (s *Scanner) PrintResults() {
@@ -382,38 +347,4 @@ func (s *Scanner) GetInactiveDependencies() []Dependency {
 
 func (s *Scanner) GetResults() *ScanResult {
 	return s.result
-}
-
-// getDirectDependencies returns a map of direct dependency paths
-func (s *Scanner) getDirectDependencies() (map[string]bool, error) {
-	cmd := exec.Command("go", "mod", "graph")
-	cmd.Dir = s.projectPath
-
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get module graph: %w", err)
-	}
-
-	directDeps := make(map[string]bool)
-	scanner := bufio.NewScanner(bytes.NewReader(output))
-	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
-			continue
-		}
-		// Format: module@version direct-dep@version
-		// We only care about direct deps (from the root module)
-		parts := bytes.Fields([]byte(line))
-		if len(parts) >= 2 {
-			// Mark as direct dependency
-			depPath := string(parts[1])
-			// Remove version suffix if present
-			if idx := bytes.IndexByte(parts[1], '@'); idx >= 0 {
-				depPath = string(parts[1][:idx])
-			}
-			directDeps[depPath] = true
-		}
-	}
-
-	return directDeps, nil
 }

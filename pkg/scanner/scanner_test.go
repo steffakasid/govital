@@ -1,6 +1,8 @@
 package scanner
 
 import (
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -248,43 +250,86 @@ func TestExtractCommitHashFromVersion(t *testing.T) {
 	}
 }
 
-func TestGetCommitTime(t *testing.T) {
+func TestGetGoProxyURLs(t *testing.T) {
 	tests := []struct {
-		name       string
-		commitHash string
-		expectNow  bool
+		name                 string
+		env                  string
+		expectedProxyCount   int
+		expectedContains     []string
 	}{
 		{
-			name:       "empty commit hash returns now",
-			commitHash: "",
-			expectNow:  true,
+			name:                 "default proxy when env empty",
+			env:                  "",
+			expectedProxyCount:   1,
+			expectedContains:     []string{"proxy.golang.org"},
+		},
+		{
+			name:                 "single custom proxy from env",
+			env:                  "https://custom.proxy.com",
+			expectedProxyCount:   1,
+			expectedContains:     []string{"custom.proxy.com"},
+		},
+		{
+			name:                 "multiple proxies in order",
+			env:                  "https://first.proxy.com,https://second.proxy.com",
+			expectedProxyCount:   2,
+			expectedContains:     []string{"first.proxy.com", "second.proxy.com"},
+		},
+		{
+			name:                 "proxy with trailing slash removed",
+			env:                  "https://custom.proxy.com/",
+			expectedProxyCount:   1,
+			expectedContains:     []string{"custom.proxy.com"},
+		},
+		{
+			name:                 "multiple proxies with spaces",
+			env:                  "https://first.proxy.com , https://second.proxy.com",
+			expectedProxyCount:   2,
+			expectedContains:     []string{"first.proxy.com", "second.proxy.com"},
+		},
+		{
+			name:                 "direct keyword is skipped",
+			env:                  "https://custom.proxy.com,direct",
+			expectedProxyCount:   1,
+			expectedContains:     []string{"custom.proxy.com"},
+		},
+		{
+			name:                 "only direct falls back to default",
+			env:                  "direct",
+			expectedProxyCount:   1,
+			expectedContains:     []string{"proxy.golang.org"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Save original GOPROXY
+			origGOPROXY := os.Getenv("GOPROXY")
+			defer os.Setenv("GOPROXY", origGOPROXY)
+
+			// Set test GOPROXY
+			if tt.env == "" {
+				os.Unsetenv("GOPROXY")
+			} else {
+				os.Setenv("GOPROXY", tt.env)
+			}
+
 			scanner := NewScanner(".")
-			commitTime, err := scanner.getCommitTime("https://github.com/nonexistent/repo", tt.commitHash)
+			proxies := scanner.getGoProxyURLs()
 
-			assert.NoError(t, err)
-
-			if tt.expectNow {
-				// Should be very recent (within 5 seconds of now)
-				diff := time.Since(commitTime)
-				assert.Less(t, diff, 5*time.Second)
+			assert.Equal(t, tt.expectedProxyCount, len(proxies))
+			for _, expected := range tt.expectedContains {
+				found := false
+				for _, p := range proxies {
+					if strings.Contains(p, expected) {
+						found = true
+						break
+					}
+				}
+				assert.True(t, found, "expected proxy containing %q not found in %v", expected, proxies)
 			}
 		})
 	}
-}
-
-func TestGetCommitTimeViaHTTP(t *testing.T) {
-	scanner := NewScanner(".")
-	commitTime, err := scanner.getCommitTimeViaHTTP("https://github.com/test/repo", "abc123")
-
-	assert.NoError(t, err)
-	// Should return current time as fallback
-	diff := time.Since(commitTime)
-	assert.Less(t, diff, 5*time.Second)
 }
 
 func TestCheckMaintenanceStatusWithError(t *testing.T) {
@@ -463,59 +508,7 @@ func (m *MockCommandExecutor) ExecuteInDir(dir, name string, args ...string) ([]
 	return nil, nil
 }
 
-// Test with mocked git commands
-func TestGetRepositoryInfoWithMockedCommands(t *testing.T) {
-	tests := []struct {
-		name              string
-		version           string
-		expectedCommitLen int
-		shouldError       bool
-	}{
-		{
-			name:              "successful pseudo-version extraction",
-			version:           "v1.0.0-20240125abcdef123456",
-			expectedCommitLen: 12,
-			shouldError:       false,
-		},
-		{
-			name:              "tagged version without commit hash",
-			version:           "v1.0.0",
-			expectedCommitLen: 0,
-			shouldError:       false,
-		},
-		{
-			name:              "version with multiple dashes",
-			version:           "v1.0.0-pre-20240125abcdef123456",
-			expectedCommitLen: 12,
-			shouldError:       false,
-		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Test commit hash extraction from version string
-			var commitHash string
-			if len(tt.version) > 0 && tt.version[0] == 'v' {
-				parts := tt.version[1:]
-				for i := len(parts) - 1; i >= 0; i-- {
-					if parts[i] == '-' {
-						suffix := parts[i+1:]
-						if len(suffix) >= 12 {
-							commitHash = suffix[len(suffix)-12:]
-						}
-						break
-					}
-				}
-			}
-
-			if tt.expectedCommitLen > 0 {
-				assert.Equal(t, tt.expectedCommitLen, len(commitHash))
-			} else {
-				assert.Equal(t, 0, len(commitHash))
-			}
-		})
-	}
-}
 
 // Test maintenance status with various scenarios
 func TestCheckMaintenanceStatusScenarios(t *testing.T) {
