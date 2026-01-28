@@ -97,31 +97,31 @@ func TestGetResults(t *testing.T) {
 func TestDependencyIsActive(t *testing.T) {
 	tests := []struct {
 		name                   string
-		daysSinceLastCommit    int
+		daysSinceLastRelease    int
 		staleThreshold         int
 		expectedIsActive       bool
 	}{
 		{
 			name:                   "recent commit should be active",
-			daysSinceLastCommit:    30,
+			daysSinceLastRelease:    30,
 			staleThreshold:         365,
 			expectedIsActive:       true,
 		},
 		{
 			name:                   "old commit should be inactive",
-			daysSinceLastCommit:    500,
+			daysSinceLastRelease:    500,
 			staleThreshold:         365,
 			expectedIsActive:       false,
 		},
 		{
 			name:                   "exactly at threshold should be active",
-			daysSinceLastCommit:    365,
+			daysSinceLastRelease:    365,
 			staleThreshold:         365,
 			expectedIsActive:       true,
 		},
 		{
 			name:                   "just over threshold should be inactive",
-			daysSinceLastCommit:    366,
+			daysSinceLastRelease:    366,
 			staleThreshold:         365,
 			expectedIsActive:       false,
 		},
@@ -135,9 +135,9 @@ func TestDependencyIsActive(t *testing.T) {
 			dep := &Dependency{
 				Path:                    "github.com/example/test",
 				Version:                 "v1.0.0",
-				LastCommitTime:          time.Now().AddDate(0, 0, -tt.daysSinceLastCommit),
-				DaysSinceLastCommit:     tt.daysSinceLastCommit,
-				IsActive:                tt.daysSinceLastCommit <= tt.staleThreshold,
+				LastReleaseTime:          time.Now().AddDate(0, 0, -tt.daysSinceLastRelease),
+				DaysSinceLastRelease:     tt.daysSinceLastRelease,
+				IsActive:                tt.daysSinceLastRelease <= tt.staleThreshold,
 			}
 
 			assert.Equal(t, tt.expectedIsActive, dep.IsActive)
@@ -354,15 +354,15 @@ func TestPrintResults(t *testing.T) {
 			Path:                "github.com/example/active",
 			Version:             "v1.0.0",
 			IsActive:            true,
-			DaysSinceLastCommit: 10,
-			LastCommitTime:      time.Now().AddDate(0, 0, -10),
+			DaysSinceLastRelease: 10,
+			LastReleaseTime:      time.Now().AddDate(0, 0, -10),
 		},
 		{
 			Path:                "github.com/example/inactive",
 			Version:             "v1.0.0",
 			IsActive:            false,
-			DaysSinceLastCommit: 400,
-			LastCommitTime:      time.Now().AddDate(0, 0, -400),
+			DaysSinceLastRelease: 400,
+			LastReleaseTime:      time.Now().AddDate(0, 0, -400),
 		},
 	}
 	scanner.result.Summary.Total = 2
@@ -383,9 +383,9 @@ func TestDependencyInitialization(t *testing.T) {
 		Update:              "v1.2.4",
 		Latest:              "v1.3.0",
 		Error:               "",
-		LastCommitTime:      time.Now(),
+		LastReleaseTime:      time.Now(),
 		IsActive:            true,
-		DaysSinceLastCommit: 5,
+		DaysSinceLastRelease: 5,
 	}
 
 	assert.Equal(t, "github.com/test/module", dep.Path)
@@ -394,7 +394,7 @@ func TestDependencyInitialization(t *testing.T) {
 	assert.Equal(t, "v1.3.0", dep.Latest)
 	assert.Empty(t, dep.Error)
 	assert.True(t, dep.IsActive)
-	assert.Equal(t, 5, dep.DaysSinceLastCommit)
+	assert.Equal(t, 5, dep.DaysSinceLastRelease)
 }
 
 func TestScanResultSummaryFields(t *testing.T) {
@@ -434,37 +434,37 @@ func TestMultipleThresholdUpdates(t *testing.T) {
 func TestDependencyStatusEdgeCases(t *testing.T) {
 	tests := []struct {
 		name                   string
-		daysSinceLastCommit    int
+		daysSinceLastRelease    int
 		staleThreshold         int
 		expectedIsActive       bool
 	}{
 		{
 			name:                   "zero days inactive",
-			daysSinceLastCommit:    0,
+			daysSinceLastRelease:    0,
 			staleThreshold:         30,
 			expectedIsActive:       true,
 		},
 		{
 			name:                   "one day inactive",
-			daysSinceLastCommit:    1,
+			daysSinceLastRelease:    1,
 			staleThreshold:         30,
 			expectedIsActive:       true,
 		},
 		{
 			name:                   "exactly at threshold",
-			daysSinceLastCommit:    30,
+			daysSinceLastRelease:    30,
 			staleThreshold:         30,
 			expectedIsActive:       true,
 		},
 		{
 			name:                   "one day over threshold",
-			daysSinceLastCommit:    31,
+			daysSinceLastRelease:    31,
 			staleThreshold:         30,
 			expectedIsActive:       false,
 		},
 		{
 			name:                   "far over threshold",
-			daysSinceLastCommit:    1000,
+			daysSinceLastRelease:    1000,
 			staleThreshold:         30,
 			expectedIsActive:       false,
 		},
@@ -478,9 +478,9 @@ func TestDependencyStatusEdgeCases(t *testing.T) {
 			dep := &Dependency{
 				Path:                    "github.com/example/test",
 				Version:                 "v1.0.0",
-				LastCommitTime:          time.Now().AddDate(0, 0, -tt.daysSinceLastCommit),
-				DaysSinceLastCommit:     tt.daysSinceLastCommit,
-				IsActive:                tt.daysSinceLastCommit <= tt.staleThreshold,
+				LastReleaseTime:          time.Now().AddDate(0, 0, -tt.daysSinceLastRelease),
+				DaysSinceLastRelease:     tt.daysSinceLastRelease,
+				IsActive:                tt.daysSinceLastRelease <= tt.staleThreshold,
 			}
 
 			assert.Equal(t, tt.expectedIsActive, dep.IsActive)
@@ -552,8 +552,8 @@ func TestCheckMaintenanceStatusScenarios(t *testing.T) {
 			dep := &Dependency{
 				Path:                "github.com/test/module",
 				Version:             "v1.0.0",
-				LastCommitTime:      time.Now().AddDate(0, 0, -tt.daysOld),
-				DaysSinceLastCommit: tt.daysOld,
+				LastReleaseTime:      time.Now().AddDate(0, 0, -tt.daysOld),
+				DaysSinceLastRelease: tt.daysOld,
 				IsActive:            tt.daysOld <= tt.threshold,
 			}
 

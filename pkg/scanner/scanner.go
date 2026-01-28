@@ -18,14 +18,14 @@ import (
 )
 
 type Dependency struct {
-	Path                string
-	Version             string
-	Update              string
-	Latest              string
-	Error               string
-	LastCommitTime      time.Time
-	IsActive            bool
-	DaysSinceLastCommit int
+	Path                 string
+	Version              string
+	Update               string
+	Latest               string
+	Error                string
+	LastReleaseTime      time.Time
+	IsActive             bool
+	DaysSinceLastRelease int
 }
 
 type ScanResult struct {
@@ -67,7 +67,7 @@ func NewScanner(projectPath string) *Scanner {
 	}
 }
 
-// isStale returns true if a dependency is stale based on days since last commit
+// isStale returns true if a dependency is stale based on days since last release
 func (s *Scanner) isStale(daysSinceCommit int) bool {
 	return daysSinceCommit > s.staleThresholdDays
 }
@@ -213,11 +213,11 @@ func (s *Scanner) checkMaintenanceStatus(dep *Dependency) error {
 		return nil
 	}
 
-	dep.LastCommitTime = commitTime
-	daysSinceCommit := int(time.Since(dep.LastCommitTime).Hours() / 24)
-	dep.DaysSinceLastCommit = daysSinceCommit
+	dep.LastReleaseTime = commitTime
+	daysSinceRelease := int(time.Since(dep.LastReleaseTime).Hours() / 24)
+	dep.DaysSinceLastRelease = daysSinceRelease
 
-	if s.isStale(daysSinceCommit) {
+	if s.isStale(daysSinceRelease) {
 		dep.IsActive = false
 	}
 
@@ -325,9 +325,9 @@ func (s *Scanner) PrintResults() {
 
 		if dep.Error != "" {
 			fmt.Printf("  - %s@%s [ERROR: %s]\n", dep.Path, dep.Version, dep.Error)
-		} else if !dep.LastCommitTime.IsZero() {
-			fmt.Printf("  - %s@%s [%s] (last commit: %d days ago)\n",
-				dep.Path, dep.Version, status, dep.DaysSinceLastCommit)
+		} else if !dep.LastReleaseTime.IsZero() {
+			fmt.Printf("  - %s@%s [%s] (last release: %d days ago)\n",
+				dep.Path, dep.Version, status, dep.DaysSinceLastRelease)
 		} else {
 			fmt.Printf("  - %s@%s [%s]\n", dep.Path, dep.Version, status)
 		}
