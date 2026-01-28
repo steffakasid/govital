@@ -73,6 +73,7 @@ Create `govital.yaml` in one of these locations (checked in order):
 
 . Current directory (`.`)
 . `$HOME/.govital/`
+. `$HOME/.config/govital/`
 . `/etc/govital/`
 
 Example configuration:

@@ -29,6 +29,7 @@ func (c *Config) Init() {
 	c.viper.SetConfigType("yaml")
 	c.viper.AddConfigPath(".")
 	c.viper.AddConfigPath("/etc/govital/")
+	c.viper.AddConfigPath(os.ExpandEnv("$HOME/.config/govital"))
 	c.viper.AddConfigPath(os.ExpandEnv("$HOME/.govital"))
 
 	// Set defaults
