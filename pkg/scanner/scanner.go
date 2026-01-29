@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/steffakasid/eslog"
+	"golang.org/x/mod/semver"
 )
 
 type Dependency struct {
@@ -179,7 +180,9 @@ func (s *Scanner) scanParallel(depsToScan []Dependency) {
 
 	// Start worker goroutines
 	for i := 0; i < s.workers; i++ {
-		wg.Go(func() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			for dep := range depChan {
 				// Check maintenance status
 				if err := s.checkMaintenanceStatus(dep); err != nil {
@@ -193,9 +196,12 @@ func (s *Scanner) scanParallel(depsToScan []Dependency) {
 				if !dep.IsActive {
 					s.result.Summary.Inactive++
 				}
+				if dep.Update != "" {
+					s.result.Summary.Updated++
+				}
 				s.resultMutex.Unlock()
 			}
-		})
+		}()
 	}
 
 	// Send dependencies to be scanned
@@ -223,6 +229,18 @@ func (s *Scanner) checkMaintenanceStatus(dep *Dependency) error {
 
 	if s.isStale(daysSinceRelease) {
 		dep.IsActive = false
+	}
+
+	// Get latest version
+	latestVersion, err := s.getLatestVersionFromProxy(dep.Path)
+	if err != nil {
+		eslog.Debugf("Failed to get latest version for %s: %v", dep.Path, err)
+	} else {
+		dep.Latest = latestVersion
+		// Check if update is available
+		if semver.Compare(dep.Version, latestVersion) < 0 {
+			dep.Update = latestVersion
+		}
 	}
 
 	return nil
@@ -310,6 +328,48 @@ func (s *Scanner) getVersionInfoFromProxy(modulePath, version string) (time.Time
 	return time.Time{}, fmt.Errorf("no proxies available")
 }
 
+// getLatestVersionFromProxy fetches the latest version from the Go proxy
+func (s *Scanner) getLatestVersionFromProxy(modulePath string) (string, error) {
+	proxies := s.getGoProxyURLs()
+	var lastErr error
+
+	// Try each proxy in order
+	for i, proxyURL := range proxies {
+		escapedPath := url.PathEscape(modulePath)
+		latestURL := fmt.Sprintf("%s/%s/@latest", proxyURL, escapedPath)
+
+		response, err := http.Get(latestURL)
+		if err != nil {
+			lastErr = fmt.Errorf("proxy %s: %w", proxyURL, err)
+			eslog.Debugf("Failed to fetch latest from proxy %d/%d (%s): %v", i+1, len(proxies), proxyURL, err)
+			continue
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("proxy %s returned status %d", proxyURL, response.StatusCode)
+			eslog.Debugf("Proxy %d/%d (%s) latest failed: %v", i+1, len(proxies), proxyURL, lastErr)
+			continue
+		}
+
+		var info versionInfo
+		if err := json.NewDecoder(response.Body).Decode(&info); err != nil {
+			lastErr = fmt.Errorf("failed to decode latest version from proxy %s: %w", proxyURL, err)
+			eslog.Debugf("Failed to decode latest from proxy %d/%d (%s): %v", i+1, len(proxies), proxyURL, err)
+			continue
+		}
+
+		eslog.Debugf("Successfully fetched latest version for %s from proxy %d/%d (%s): %s", modulePath, i+1, len(proxies), proxyURL, info.Version)
+		return info.Version, nil
+	}
+
+	// All proxies failed
+	if lastErr != nil {
+		return "", fmt.Errorf("failed to fetch latest version from all %d proxies: %w", len(proxies), lastErr)
+	}
+	return "", fmt.Errorf("no proxies available")
+}
+
 func (s *Scanner) PrintResults() {
 	fmt.Printf("\n=== Govital Dependency Scan Results ===\n")
 	fmt.Printf("Project: %s\n", s.projectPath)
@@ -328,20 +388,29 @@ func (s *Scanner) PrintResults() {
 	// Count inactive dependencies by type
 	directInactive := 0
 	indirectInactive := 0
+	directUpdates := 0
+	indirectUpdates := 0
 	for _, dep := range directDeps {
 		if !dep.IsActive {
 			directInactive++
+		}
+		if dep.Update != "" {
+			directUpdates++
 		}
 	}
 	for _, dep := range indirectDeps {
 		if !dep.IsActive {
 			indirectInactive++
 		}
+		if dep.Update != "" {
+			indirectUpdates++
+		}
 	}
 
 	fmt.Printf("Summary:\n")
 	fmt.Printf("  Total Dependencies:        %d\n", s.result.Summary.Total)
 	fmt.Printf("  Inactive Dependencies:     %d (Direct: %d, Indirect: %d)\n", s.result.Summary.Inactive, directInactive, indirectInactive)
+	fmt.Printf("  Update Available:          %d (Direct: %d, Indirect: %d)\n", directUpdates+indirectUpdates, directUpdates, indirectUpdates)
 	fmt.Printf("  Errors:                    %d\n", s.result.Summary.Errors)
 	fmt.Printf("\nDependencies:\n")
 
@@ -354,13 +423,20 @@ func (s *Scanner) PrintResults() {
 				status = "✗ Inactive"
 			}
 
+			updateStatus := ""
+			if dep.Update != "" {
+				updateStatus = fmt.Sprintf(" [UPDATE: %s]", dep.Update)
+			} else if dep.Latest != "" {
+				updateStatus = " [Latest]"
+			}
+
 			if dep.Error != "" {
 				fmt.Printf("  - %s@%s [ERROR: %s]\n", dep.Path, dep.Version, dep.Error)
 			} else if !dep.LastReleaseTime.IsZero() {
-				fmt.Printf("  - %s@%s [%s] (last release: %d days ago)\n",
-					dep.Path, dep.Version, status, dep.DaysSinceLastRelease)
+				fmt.Printf("  - %s@%s [%s] (last release: %d days ago)%s\n",
+					dep.Path, dep.Version, status, dep.DaysSinceLastRelease, updateStatus)
 			} else {
-				fmt.Printf("  - %s@%s [%s]\n", dep.Path, dep.Version, status)
+				fmt.Printf("  - %s@%s [%s]%s\n", dep.Path, dep.Version, status, updateStatus)
 			}
 		}
 	}
@@ -374,13 +450,20 @@ func (s *Scanner) PrintResults() {
 				status = "✗ Inactive"
 			}
 
+			updateStatus := ""
+			if dep.Update != "" {
+				updateStatus = fmt.Sprintf(" [UPDATE: %s]", dep.Update)
+			} else if dep.Latest != "" {
+				updateStatus = " [Latest]"
+			}
+
 			if dep.Error != "" {
 				fmt.Printf("  - %s@%s [ERROR: %s]\n", dep.Path, dep.Version, dep.Error)
 			} else if !dep.LastReleaseTime.IsZero() {
-				fmt.Printf("  - %s@%s [%s] (last release: %d days ago)\n",
-					dep.Path, dep.Version, status, dep.DaysSinceLastRelease)
+				fmt.Printf("  - %s@%s [%s] (last release: %d days ago)%s\n",
+					dep.Path, dep.Version, status, dep.DaysSinceLastRelease, updateStatus)
 			} else {
-				fmt.Printf("  - %s@%s [%s]\n", dep.Path, dep.Version, status)
+				fmt.Printf("  - %s@%s [%s]%s\n", dep.Path, dep.Version, status, updateStatus)
 			}
 		}
 	}
