@@ -122,7 +122,11 @@ func (s *Scanner) Scan() error {
 
 	output, err := cmd.Output()
 	if err != nil {
-		eslog.Errorf("Failed to list dependencies: %v", err)
+		eslog.Errorf("Failed to list dependencies (go list -json -m all): %v", err)
+		if len(output) > 0 {
+			eslog.Errorf("go list output: %s", string(output))
+		}
+		eslog.Error()
 		return fmt.Errorf("failed to list dependencies: %w", err)
 	}
 
@@ -175,9 +179,7 @@ func (s *Scanner) scanParallel(depsToScan []Dependency) {
 
 	// Start worker goroutines
 	for i := 0; i < s.workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for dep := range depChan {
 				// Check maintenance status
 				if err := s.checkMaintenanceStatus(dep); err != nil {
@@ -193,7 +195,7 @@ func (s *Scanner) scanParallel(depsToScan []Dependency) {
 				}
 				s.resultMutex.Unlock()
 			}
-		}()
+		})
 	}
 
 	// Send dependencies to be scanned
