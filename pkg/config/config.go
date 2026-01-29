@@ -37,6 +37,7 @@ func (c *Config) Init() {
 	c.viper.SetDefault("scanner.stale_threshold_days", 180)
 	c.viper.SetDefault("scanner.active_threshold_days", 90)
 	c.viper.SetDefault("scanner.include_indirect_dependencies", false)
+	c.viper.SetDefault("scanner.acknowledged_dependencies", []string{})
 
 	// Read config file
 	if err := c.viper.ReadInConfig(); err != nil {
@@ -103,4 +104,20 @@ func (c *Config) GetIncludeIndirectDependencies() bool {
 // SetIncludeIndirectDependencies sets whether to include indirect dependencies.
 func (c *Config) SetIncludeIndirectDependencies(include bool) {
 	c.viper.Set("scanner.include_indirect_dependencies", include)
+}
+
+// GetAcknowledgedDependencies returns a list of module paths to acknowledge as inactive.
+// These dependencies are marked as known/acknowledged and don't count against the scan results.
+// Default: empty list
+func (c *Config) GetAcknowledgedDependencies() []string {
+	deps := c.viper.GetStringSlice("scanner.acknowledged_dependencies")
+	if deps == nil {
+		return []string{}
+	}
+	return deps
+}
+
+// SetAcknowledgedDependencies sets the list of acknowledged dependencies.
+func (c *Config) SetAcknowledgedDependencies(deps []string) {
+	c.viper.Set("scanner.acknowledged_dependencies", deps)
 }

@@ -56,6 +56,14 @@ actively maintained and if the used versions are up to date.`,
 			s.SetWorkers(workers)
 		}
 
+		// Load acknowledged dependencies from config
+		cfg := config.NewConfig()
+		cfg.Init()
+		acknowledgedDeps := cfg.GetAcknowledgedDependencies()
+		if len(acknowledgedDeps) > 0 {
+			s.SetAcknowledgedDependencies(acknowledgedDeps)
+		}
+
 		if err := s.Scan(); err != nil {
 			eslog.Errorf("Scan failed: %v", err)
 			return err

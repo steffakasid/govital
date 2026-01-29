@@ -124,7 +124,6 @@ include::CONFIGURATION.adoc[leveloffset=+1]
 * Scan multiple projects e.g. from Github organization or Gitlab group
 * Build Docker images with Govital pre-installed for CI/CD integration
 * Expose results as Prometheus metrics for monitoring
-* Support acknowledging known outdated dependencies to suppress warnings
 
 == License
 

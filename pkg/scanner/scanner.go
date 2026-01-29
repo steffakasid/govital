@@ -27,6 +27,7 @@ type Dependency struct {
 	LastReleaseTime      time.Time
 	IsActive             bool
 	IsIndirect           bool
+	IsAcknowledged       bool
 	DaysSinceLastRelease int
 }
 
@@ -50,6 +51,7 @@ type Scanner struct {
 	includeIndirectDependencies bool
 	workers                     int
 	resultMutex                 *sync.Mutex
+	acknowledgedDependencies    map[string]bool
 }
 
 func NewScanner(projectPath string) *Scanner {
@@ -66,6 +68,7 @@ func NewScanner(projectPath string) *Scanner {
 		workers:                     4,
 		resultMutex:                 &sync.Mutex{},
 		result:                      result,
+		acknowledgedDependencies:    make(map[string]bool),
 	}
 }
 
@@ -107,6 +110,13 @@ func (s *Scanner) SetStaleThreshold(days int) {
 
 func (s *Scanner) SetIncludeIndirectDependencies(include bool) {
 	s.includeIndirectDependencies = include
+}
+
+func (s *Scanner) SetAcknowledgedDependencies(deps []string) {
+	s.acknowledgedDependencies = make(map[string]bool)
+	for _, dep := range deps {
+		s.acknowledgedDependencies[dep] = true
+	}
 }
 
 func (s *Scanner) Scan() error {
@@ -184,6 +194,11 @@ func (s *Scanner) scanParallel(depsToScan []Dependency) {
 		go func() {
 			defer wg.Done()
 			for dep := range depChan {
+				// Check if dependency is acknowledged
+				if s.acknowledgedDependencies[dep.Path] {
+					dep.IsAcknowledged = true
+				}
+
 				// Check maintenance status
 				if err := s.checkMaintenanceStatus(dep); err != nil {
 					eslog.Debugf("Failed to check maintenance status for %s: %v", dep.Path, err)
@@ -193,7 +208,7 @@ func (s *Scanner) scanParallel(depsToScan []Dependency) {
 				s.resultMutex.Lock()
 				s.result.Dependencies = append(s.result.Dependencies, *dep)
 				s.result.Summary.Total++
-				if !dep.IsActive {
+				if !dep.IsActive && !dep.IsAcknowledged {
 					s.result.Summary.Inactive++
 				}
 				if dep.Update != "" {
@@ -390,9 +405,15 @@ func (s *Scanner) PrintResults() {
 	indirectInactive := 0
 	directUpdates := 0
 	indirectUpdates := 0
+	directAcknowledged := 0
+	indirectAcknowledged := 0
 	for _, dep := range directDeps {
 		if !dep.IsActive {
-			directInactive++
+			if !dep.IsAcknowledged {
+				directInactive++
+			} else {
+				directAcknowledged++
+			}
 		}
 		if dep.Update != "" {
 			directUpdates++
@@ -400,7 +421,11 @@ func (s *Scanner) PrintResults() {
 	}
 	for _, dep := range indirectDeps {
 		if !dep.IsActive {
-			indirectInactive++
+			if !dep.IsAcknowledged {
+				indirectInactive++
+			} else {
+				indirectAcknowledged++
+			}
 		}
 		if dep.Update != "" {
 			indirectUpdates++
@@ -410,6 +435,7 @@ func (s *Scanner) PrintResults() {
 	fmt.Printf("Summary:\n")
 	fmt.Printf("  Total Dependencies:        %d\n", s.result.Summary.Total)
 	fmt.Printf("  Inactive Dependencies:     %d (Direct: %d, Indirect: %d)\n", s.result.Summary.Inactive, directInactive, indirectInactive)
+	fmt.Printf("  Acknowledged:              %d (Direct: %d, Indirect: %d)\n", directAcknowledged+indirectAcknowledged, directAcknowledged, indirectAcknowledged)
 	fmt.Printf("  Update Available:          %d (Direct: %d, Indirect: %d)\n", directUpdates+indirectUpdates, directUpdates, indirectUpdates)
 	fmt.Printf("  Errors:                    %d\n", s.result.Summary.Errors)
 	fmt.Printf("\nDependencies:\n")
@@ -420,7 +446,11 @@ func (s *Scanner) PrintResults() {
 		for _, dep := range directDeps {
 			status := "✓ Active"
 			if !dep.IsActive {
-				status = "✗ Inactive"
+				if dep.IsAcknowledged {
+					status = "⊘ Acknowledged"
+				} else {
+					status = "✗ Inactive"
+				}
 			}
 
 			updateStatus := ""
@@ -447,7 +477,11 @@ func (s *Scanner) PrintResults() {
 		for _, dep := range indirectDeps {
 			status := "✓ Active"
 			if !dep.IsActive {
-				status = "✗ Inactive"
+				if dep.IsAcknowledged {
+					status = "⊘ Acknowledged"
+				} else {
+					status = "✗ Inactive"
+				}
 			}
 
 			updateStatus := ""

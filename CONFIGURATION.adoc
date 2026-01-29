@@ -41,6 +41,16 @@ Govital supports flexible configuration through multiple methods with a clear pr
 * *Default*: `info`
 * *Options*: `debug`, `info`, `warn`, `error`
 
+==== `acknowledged_dependencies`
+
+* *Description*: List of module paths to acknowledge as inactive without marking as errors
+* *Type*: Array of strings
+* *Default*: empty list
+* *Example*: 
+  - `github.com/user/legacy-lib`
+  - `github.com/company/internal-tool`
+* *Note*: Acknowledged dependencies are marked with ⊘ symbol and not counted in the inactive count
+
 == Configuration Methods
 
 === 1. CLI Flags (Highest Priority)
@@ -93,6 +103,11 @@ scanner:
 
   # Include indirect (transitive) dependencies
   include_indirect_dependencies: false
+
+  # List of dependencies to acknowledge as inactive
+  acknowledged_dependencies:
+    - golang.org/x/net
+    - github.com/legacy/package
 ----
 
 === 3. Environment Variables
@@ -200,7 +215,39 @@ Want to ensure all dependencies are actively maintained:
 govital scan --stale-threshold 90
 ----
 
-=== Case 2: Legacy Project - Mature Dependencies
+=== Case 2: Acknowledge Specific Inactive Dependencies
+
+You have some dependencies that are intentionally inactive but acceptable (e.g., stable/mature libraries or internal legacy packages):
+
+[source,yaml]
+----
+# ~/.govital/govital.yaml
+scanner:
+  stale_threshold_days: 180
+  
+  # These dependencies won't count as "Inactive" in the results
+  acknowledged_dependencies:
+    - golang.org/x/sync
+    - github.com/company/internal-api
+    - github.com/deprecated/legacy-lib
+----
+
+Result output:
+
+[source]
+----
+Summary:
+  Total Dependencies:        10
+  Inactive Dependencies:     2 (Direct: 1, Indirect: 1)
+  Acknowledged:              3 (Direct: 2, Indirect: 1)
+  ...
+
+Dependencies:
+  - golang.org/x/sync@v0.1.0 [⊘ Acknowledged] (last release: 200 days ago)
+  - github.com/company/internal-api@v1.0.0 [⊘ Acknowledged] (last release: 150 days ago)
+----
+
+=== Case 3: Legacy Project - Mature Dependencies
 
 Project uses stable, mature libraries that update infrequently:
 
@@ -215,7 +262,7 @@ EOF
 govital scan
 ----
 
-=== Case 3: CI/CD Pipeline Audit
+=== Case 4: CI/CD Pipeline Audit
 
 Run in CI with specific policy:
 
