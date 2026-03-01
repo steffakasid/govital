@@ -2,9 +2,9 @@
 name: goreleaser
 
 on:
-  push:
-    tags:
-      - "*"
+  schedule:
+    # * is a special character in YAML so you have to quote this string
+    - cron: "0 0 2 * *"
 
 permissions:
   contents: write
@@ -21,13 +21,10 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: 1.26.0
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v7
+      - uses: go-semantic-release/action@v1
         with:
-          # either 'goreleaser' (default) or 'goreleaser-pro'
-          distribution: goreleaser
-          version: latest
-          args: release --clean
+          changelog-generator-opt: "emojis=true"
+          hooks: goreleaser
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
