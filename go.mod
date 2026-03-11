@@ -7,7 +7,7 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/steffakasid/eslog v0.3.8
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/mod v0.33.0
+	golang.org/x/mod v0.34.0
 )
 
 require (
