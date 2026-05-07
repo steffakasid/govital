@@ -29,10 +29,7 @@ archives:
       - govital
     format: tar.gz
     name_template: >-
-      {{ .ProjectName }}_
-      {{- .Version }}_
-      {{- .Os }}_
-      {{- .Arch }}
+      {{ .ProjectName }}_ {{- .Version }}_ {{- .Os }}_ {{- .Arch }}
 
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
@@ -48,7 +45,7 @@ changelog:
 brews:
   - repository:
       owner: steffakasid
-  name: homebrew-tap
+      name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
     url_template: "https://github.com/steffakasid/govital/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
@@ -62,7 +59,8 @@ brews:
     directory: Formula
 
     homepage: "https://github.com/steffakasid/govital"
-    description: "Go dependency maintenance scanner"
+    description: >-
+      Check Go dependencies for updates and maintenance activity
     license: "Apache-2.0"
 
 release:
