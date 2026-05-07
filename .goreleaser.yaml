@@ -48,7 +48,7 @@ changelog:
 brews:
   - repository:
       owner: steffakasid
-      name: homebrew-govital
+  name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
     url_template: "https://github.com/steffakasid/govital/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
