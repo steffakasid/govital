@@ -25,12 +25,12 @@ func NewConfig() *Config {
 }
 
 func (c *Config) Init() {
-	c.viper.SetConfigName("govital")
+	c.viper.SetConfigName(".govital")
 	c.viper.SetConfigType("yaml")
 	c.viper.AddConfigPath(".")
 	c.viper.AddConfigPath("/etc/govital/")
-	c.viper.AddConfigPath(os.ExpandEnv("$HOME/.config/govital"))
-	c.viper.AddConfigPath(os.ExpandEnv("$HOME/.govital"))
+	c.viper.AddConfigPath(os.ExpandEnv("$HOME/.config/"))
+	c.viper.AddConfigPath(os.ExpandEnv("$HOME/"))
 
 	// Set defaults
 	c.viper.SetDefault("log_level", "info")
