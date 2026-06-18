@@ -1,0 +1,8 @@
+---
+log_level: debug # Options: debug, info, warn, error
+scanner:
+  stale_threshold_days: 365
+  acknowledged_dependencies:
+    # - golang.org/x/net
+    # - github.com/legacy/stable-package
+    # - github.com/company/internal-tool
