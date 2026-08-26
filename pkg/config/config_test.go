@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,25 +18,19 @@ func TestNewConfig(t *testing.T) {
 }
 
 func TestConfigInit(t *testing.T) {
-	// Create temporary directory for config testing
 	tmpDir := t.TempDir()
+	origDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(tmpDir))
+	defer os.Chdir(origDir)
 
-	// Create a test config file
-	configPath := filepath.Join(tmpDir, "govital.yaml")
 	configContent := `log_level: debug`
-	err := os.WriteFile(configPath, []byte(configContent), 0600)
+	err = os.WriteFile(filepath.Join(tmpDir, ".govital.yaml"), []byte(configContent), 0600)
 	require.NoError(t, err)
 
-	// Create a new viper instance for this test
-	testViper := viper.New()
-	testViper.SetConfigName("govital")
-	testViper.SetConfigType("yaml")
-	testViper.AddConfigPath(tmpDir)
-
-	cfg := &Config{viper: testViper}
+	cfg := NewConfig()
 	cfg.Init()
 
-	// Verify config was loaded
 	logLevel := cfg.viper.GetString("log_level")
 	assert.Equal(t, "debug", logLevel)
 }
