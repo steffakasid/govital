@@ -190,9 +190,7 @@ func (s *Scanner) scanParallel(depsToScan []Dependency) {
 
 	// Start worker goroutines
 	for i := 0; i < s.workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for dep := range depChan {
 				// Check if dependency is acknowledged
 				if s.acknowledgedDependencies[dep.Path] {
@@ -216,7 +214,7 @@ func (s *Scanner) scanParallel(depsToScan []Dependency) {
 				}
 				s.resultMutex.Unlock()
 			}
-		}()
+		})
 	}
 
 	// Send dependencies to be scanned
@@ -271,7 +269,7 @@ func (s *Scanner) getGoProxyURLs() []string {
 	}
 
 	var proxies []string
-	for _, p := range strings.Split(goproxy, ",") {
+	for p := range strings.SplitSeq(goproxy, ",") {
 		p = strings.TrimSpace(p)
 		if p != "" && p != "direct" {
 			// Remove trailing slash for consistency
